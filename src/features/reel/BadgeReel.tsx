@@ -18,8 +18,9 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 
+import type { BadgeCard } from "@/features/cards/types";
+
 import { BadgeReelCard } from "./BadgeReelCard";
-import type { MockBadgeCard } from "./mockCards";
 import { ReelClip } from "./ReelClip";
 import {
   VISIBLE_CARD_RADIUS,
@@ -29,17 +30,17 @@ import {
 } from "./reelMath";
 
 type BadgeReelProps = {
-  cards: MockBadgeCard[];
+  cards: BadgeCard[];
   initialCardId?: string;
   reduceMotion: boolean;
   hapticsEnabled: boolean;
-  onCardPress: (card: MockBadgeCard) => void;
-  onCardLongPress: (card: MockBadgeCard) => void;
-  onFavoriteToggle: (card: MockBadgeCard) => void;
+  onCardPress: (card: BadgeCard) => void;
+  onCardLongPress: (card: BadgeCard) => void;
+  onFavoriteToggle: (card: BadgeCard) => void;
 };
 
 type AnimatedReelItemProps = {
-  card: MockBadgeCard;
+  card: BadgeCard;
   index: number;
   progress: SharedValue<number>;
   cardWidth: number;
@@ -257,7 +258,7 @@ export function BadgeReel({
   );
 
   const handleLongPress = useCallback(
-    (card: MockBadgeCard) => {
+    (card: BadgeCard) => {
       if (hapticsEnabled) {
         triggerLongPressHaptic();
       }
