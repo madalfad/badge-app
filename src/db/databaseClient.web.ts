@@ -1,9 +1,9 @@
-import type { AppDatabase } from './types';
+import type { AppDatabase } from "./types";
 
 export async function getDatabase(): Promise<AppDatabase> {
-  throw new Error('SQLite persistence is only enabled on native platforms in this milestone.');
+  throw new Error("SQLite persistence is only enabled on native platforms.");
 }
 
 export async function deleteDatabaseForDev() {
-  // No-op: the milestone 2 SQLite implementation targets native platforms.
+  // No-op: local SQLite persistence targets native platforms.
 }

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "badge-app",
+    "name": "BadgeDeck",
     "slug": "badge-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,11 +8,11 @@
     "scheme": "badgeapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#07111F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -25,11 +25,16 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "root": "src/app"
+        }
+      ],
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#07111F",
           "android": {
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76
@@ -41,6 +46,21 @@
         {
           "enableFTS": true,
           "useSQLCipher": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow BadgeDeck to access photos so you can import reference cards.",
+          "cameraPermission": "Allow BadgeDeck to use the camera so you can capture reference cards.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-file-system",
+        {
+          "supportsOpeningDocumentsInPlace": false,
+          "enableFileSharing": false
         }
       ]
     ],

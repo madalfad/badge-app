@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import { listCards, markViewed, toggleFavorite as toggleFavoriteInDb } from '@/db/repositories/cardsRepository';
-import { useDatabaseContext } from '@/db/DatabaseProvider';
+import {
+  listCards,
+  markViewed,
+  toggleFavorite as toggleFavoriteInDb,
+} from "@/db/repositories/cardsRepository";
+import { useDatabaseContext } from "@/db/DatabaseProvider";
 
-import { mockBadgeCards } from '../reel/mockCards';
-import type { BadgeCard } from './types';
+import { sampleBadgeCards } from "../reel/sampleCards";
+import type { BadgeCard } from "./types";
 
 type UseCardsResult = {
   cards: BadgeCard[];
@@ -17,7 +21,9 @@ type UseCardsResult = {
 };
 
 function toggleFavoriteInMemory(cards: BadgeCard[], cardId: string) {
-  return cards.map((card) => (card.id === cardId ? { ...card, isFavorite: !card.isFavorite } : card));
+  return cards.map((card) =>
+    card.id === cardId ? { ...card, isFavorite: !card.isFavorite } : card,
+  );
 }
 
 export function useCards(): UseCardsResult {
@@ -34,17 +40,21 @@ export function useCards(): UseCardsResult {
     setIsLoading(true);
     try {
       if (!db) {
-        setCards(mockBadgeCards);
+        setCards(sampleBadgeCards);
         setLoadError(databaseError);
         return;
       }
 
       const nextCards = await listCards(db);
-      setCards(nextCards.length > 0 ? nextCards : mockBadgeCards);
+      setCards(nextCards.length > 0 ? nextCards : sampleBadgeCards);
       setLoadError(null);
     } catch (caughtError) {
-      setCards(mockBadgeCards);
-      setLoadError(caughtError instanceof Error ? caughtError : new Error(String(caughtError)));
+      setCards(sampleBadgeCards);
+      setLoadError(
+        caughtError instanceof Error
+          ? caughtError
+          : new Error(String(caughtError)),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -65,8 +75,14 @@ export function useCards(): UseCardsResult {
       try {
         await toggleFavoriteInDb(db, cardId);
       } catch (caughtError) {
-        setCards((currentCards) => toggleFavoriteInMemory(currentCards, cardId));
-        setLoadError(caughtError instanceof Error ? caughtError : new Error(String(caughtError)));
+        setCards((currentCards) =>
+          toggleFavoriteInMemory(currentCards, cardId),
+        );
+        setLoadError(
+          caughtError instanceof Error
+            ? caughtError
+            : new Error(String(caughtError)),
+        );
       }
     },
     [db],

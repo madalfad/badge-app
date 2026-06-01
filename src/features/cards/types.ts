@@ -13,6 +13,11 @@ export type BadgeCard = {
   sections: BadgeCardSection[];
   footer: string;
   isFavorite: boolean;
+  frontThumbnailUri?: string | null;
+  frontDisplayUri?: string | null;
+  frontFileUri?: string | null;
+  imageAspectRatio?: number | null;
+  hasUserImage?: boolean;
 };
 
 export type CardRecord = {
@@ -79,20 +84,20 @@ export type CreateCardInput = {
 export type UpdateCardInput = Partial<
   Pick<
     CreateCardInput,
-    | 'title'
-    | 'subtitle'
-    | 'categoryId'
-    | 'primaryColor'
-    | 'sortOrder'
-    | 'isFavorite'
-    | 'isArchived'
-    | 'reviewDate'
-    | 'sourceType'
-    | 'notes'
+    | "title"
+    | "subtitle"
+    | "categoryId"
+    | "primaryColor"
+    | "sortOrder"
+    | "isFavorite"
+    | "isArchived"
+    | "reviewDate"
+    | "sourceType"
+    | "notes"
   >
 >;
 
-export type PrototypeCardNotes = {
+export type SeededCardNotes = {
   code?: string;
   sections?: BadgeCardSection[];
   footer?: string;

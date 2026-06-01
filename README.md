@@ -1,56 +1,55 @@
-# Welcome to your Expo app 👋
+# BadgeDeck
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+BadgeDeck is an offline-first Expo app for healthcare professionals to store and quickly view digital copies of badge reference cards.
 
-## Get started
+The current build includes:
 
-1. Install dependencies
+- A tactile 3D badge reel home screen
+- Local SQLite metadata storage
+- Local app document storage for imported images
+- Camera/photo-library import for front and optional back card images
+- Display/thumbnail image generation
+- Full-screen viewer with pinch, pan, double-tap zoom, front/back switching, favorites, archive, and high-contrast mode
 
-   ```bash
-   npm install
-   ```
+## Requirements
 
-2. Start the app
+- Expo SDK 56
+- Node.js `22.13.x` or newer in the SDK-supported range
+- A development build for native testing; Expo Go is not the right runtime for this app because it uses native modules and config plugins.
 
-   ```bash
-   npx expo start
-   ```
+Project rule: check the versioned Expo docs at <https://docs.expo.dev/versions/v56.0.0/> before changing Expo APIs or config.
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Setup
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Run locally
 
-### Other setup steps
+For web/static validation:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npx expo start --web
+```
 
-## Learn more
+For Android/iOS native testing, build and run a development client:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npx eas build --profile development --platform android
+npx expo start --dev-client
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Useful checks
 
-## Join the community
+```bash
+npx tsc --noEmit
+npx expo export --platform web
+npx expo install --check
+```
 
-Join our community of developers creating universal apps.
+## Notes
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- MVP is local-only and does not claim HIPAA compliance.
+- Avoid storing PHI or patient identifiers in badge images or notes.
+- Imported card files are app user data and are stored under the app document directory.

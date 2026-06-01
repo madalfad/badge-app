@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { memo, useEffect, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -54,6 +55,9 @@ function BadgeReelCardComponent({
     }, 210);
   };
 
+  const imageUri =
+    card.frontThumbnailUri ?? card.frontDisplayUri ?? card.frontFileUri;
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -70,61 +74,110 @@ function BadgeReelCardComponent({
         },
       ]}
     >
-      <View style={[styles.card, focused && styles.focusedCard]}>
+      {imageUri ? (
         <View
-          style={[styles.accentRail, { backgroundColor: card.accentColor }]}
-        />
-        <View style={styles.laminateShine} />
-        <View style={styles.headerRow}>
+          style={[styles.card, styles.imageCard, focused && styles.focusedCard]}
+        >
+          <Image
+            source={{ uri: imageUri }}
+            contentFit="cover"
+            recyclingKey={card.id}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.imageScrim} />
           <View
-            style={[
-              styles.categoryPill,
-              { backgroundColor: `${card.accentColor}24` },
-            ]}
-          >
-            <Text style={[styles.categoryText, { color: card.accentColor }]}>
-              {card.category}
+            style={[styles.accentRail, { backgroundColor: card.accentColor }]}
+          />
+          <View style={styles.imageTopRow}>
+            <View
+              style={[
+                styles.imageCategoryPill,
+                { backgroundColor: `${card.accentColor}E6` },
+              ]}
+            >
+              <Text style={styles.imageCategoryText}>{card.category}</Text>
+            </View>
+            <Text
+              style={[
+                styles.imageFavorite,
+                card.isFavorite && { color: card.accentColor },
+              ]}
+            >
+              ★
             </Text>
           </View>
-          <Text style={styles.codeText}>{card.code}</Text>
-        </View>
-
-        <Text numberOfLines={2} style={styles.title}>
-          {card.title}
-        </Text>
-        <Text numberOfLines={2} style={styles.subtitle}>
-          {card.subtitle}
-        </Text>
-
-        <View style={styles.divider} />
-
-        <View style={styles.sections}>
-          {card.sections.map((section) => (
-            <View key={section.label} style={styles.sectionRow}>
-              <Text numberOfLines={1} style={styles.sectionLabel}>
-                {section.label}
+          <View style={styles.imageBottomPanel}>
+            <Text numberOfLines={2} style={styles.imageTitle}>
+              {card.title}
+            </Text>
+            {card.subtitle ? (
+              <Text numberOfLines={2} style={styles.imageSubtitle}>
+                {card.subtitle}
               </Text>
-              <Text numberOfLines={1} style={styles.sectionValue}>
-                {section.value}
+            ) : (
+              <Text numberOfLines={1} style={styles.imageSubtitle}>
+                Imported reference image
+              </Text>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={[styles.card, focused && styles.focusedCard]}>
+          <View
+            style={[styles.accentRail, { backgroundColor: card.accentColor }]}
+          />
+          <View style={styles.laminateShine} />
+          <View style={styles.headerRow}>
+            <View
+              style={[
+                styles.categoryPill,
+                { backgroundColor: `${card.accentColor}24` },
+              ]}
+            >
+              <Text style={[styles.categoryText, { color: card.accentColor }]}>
+                {card.category}
               </Text>
             </View>
-          ))}
-        </View>
+            <Text style={styles.codeText}>{card.code}</Text>
+          </View>
 
-        <View style={styles.footerRow}>
-          <Text numberOfLines={1} style={styles.footerText}>
-            {card.footer}
+          <Text numberOfLines={2} style={styles.title}>
+            {card.title}
           </Text>
-          <Text
-            style={[
-              styles.favorite,
-              card.isFavorite && { color: card.accentColor },
-            ]}
-          >
-            ★
+          <Text numberOfLines={2} style={styles.subtitle}>
+            {card.subtitle}
           </Text>
+
+          <View style={styles.divider} />
+
+          <View style={styles.sections}>
+            {card.sections.map((section) => (
+              <View key={section.label} style={styles.sectionRow}>
+                <Text numberOfLines={1} style={styles.sectionLabel}>
+                  {section.label}
+                </Text>
+                <Text numberOfLines={1} style={styles.sectionValue}>
+                  {section.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.footerRow}>
+            <Text numberOfLines={1} style={styles.footerText}>
+              {card.footer}
+            </Text>
+            <Text
+              style={[
+                styles.favorite,
+                card.isFavorite && { color: card.accentColor },
+              ]}
+            >
+              ★
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
     </Pressable>
   );
 }
@@ -148,6 +201,73 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 18 },
     elevation: 12,
+  },
+  imageCard: {
+    backgroundColor: "#020817",
+    padding: 0,
+    borderColor: "#FFFFFFCC",
+  },
+  imageScrim: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "#02081722",
+  },
+  imageTopRow: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    top: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  imageCategoryPill: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  imageCategoryText: {
+    color: "#04111F",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  imageFavorite: {
+    color: "#F8FAFC99",
+    fontSize: 24,
+    fontWeight: "900",
+    textShadowColor: "#00000080",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  imageBottomPanel: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 14,
+    borderRadius: 22,
+    backgroundColor: "#020817D9",
+    borderWidth: 1,
+    borderColor: "#FFFFFF1F",
+    padding: 15,
+  },
+  imageTitle: {
+    color: "#F8FAFC",
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+  },
+  imageSubtitle: {
+    color: "#CBD5E1",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    marginTop: 5,
   },
   focusedCard: {
     shadowOpacity: 0.34,

@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { ensurePrototypeCardsSeeded } from "@/features/cards/seedPrototypeCards";
+import { ensureSampleCardsSeeded } from "@/features/cards/seedSampleCards";
 
 import { getDatabase } from "./databaseClient";
 import type { AppDatabase } from "./types";
@@ -35,7 +35,7 @@ export function DatabaseProvider({ children }: DatabaseProviderProps) {
     async function initializeDatabase() {
       try {
         const database = await getDatabase();
-        await ensurePrototypeCardsSeeded(database);
+        await ensureSampleCardsSeeded(database);
         if (!isMounted) {
           return;
         }

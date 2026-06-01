@@ -1128,32 +1128,31 @@ Import:
 
 ## 21. MVP milestones
 
-### Milestone 1: Motion prototype
+### Milestone 1: Motion prototype — complete
 
-Deliver:
+Delivered:
 
-- mocked card data
+- seeded demo card data
 - vertical 3D reel
 - snap behavior
-- tap-to-open mock detail
+- tap-to-open viewer navigation
 - haptic selection
 - reduced motion flat fallback
 
 Acceptance:
 
-- feels smooth on a physical device
-- no database/files yet
-- card reel visual direction approved
+- reel interaction implemented
+- card reel visual direction established
 
-### Milestone 2: Local data foundation
+### Milestone 2: Local data foundation — complete
 
-Deliver:
+Delivered:
 
 - SQLite migrations
 - repositories
 - settings persistence
 - local file storage service
-- seeded sample cards optional
+- seeded sample cards
 
 Acceptance:
 
@@ -1161,12 +1160,12 @@ Acceptance:
 - DB survives restart
 - migrations are repeatable
 
-### Milestone 3: Add card MVP
+### Milestone 3: Add card MVP — complete enough for native testing
 
-Deliver:
+Delivered:
 
 - image picker/camera import
-- crop/rotate basic flow
+- crop preset/rotate basic flow
 - display/thumbnail generation
 - front/back support
 - metadata form
@@ -1174,16 +1173,22 @@ Deliver:
 
 Acceptance:
 
-- user can add a real card and see it in reel
+- user can add a real card and see it in reel in a native development build
 
-### Milestone 4: Viewer MVP
+### Milestone 4: Viewer MVP — partially complete
 
-Deliver:
+Delivered:
 
 - full-screen viewer
 - front/back toggle
 - pinch/pan/double-tap zoom
-- favorite/edit/archive controls
+- favorite/archive controls
+- high-contrast background toggle
+
+Remaining:
+
+- edit metadata/assets flow
+- stronger pan-bound clamping based on measured image/container size
 
 Acceptance:
 
@@ -1239,19 +1244,19 @@ Before implementation, decide:
 
 ---
 
-## 24. Recommended first implementation task
+## 24. Recommended next implementation task
 
-Start with **Milestone 1: Motion prototype**.
+Finish **Milestone 4: Viewer/Edit polish**, then move into Milestone 5.
 
-Build:
+Recommended next build:
 
 ```text
-src/features/reel/
-  BadgeReel.tsx
-  BadgeReelCard.tsx
-  ReelClip.tsx
-  reelMath.ts
-  mockCards.ts
+src/features/edit-card/
+  EditCardScreen.tsx
+  AssetReplacementPanel.tsx
+  MetadataForm.tsx
+
+src/app/card/[id]/edit.tsx
 ```
 
-Do not touch SQLite or file storage yet. The reel is the core product risk and should be proven first. Once the interaction feels excellent, wire it to real data.
+Focus on metadata editing, replacing front/back images, deleting cards/files safely, and tightening viewer pan bounds before app-lock/security work.
