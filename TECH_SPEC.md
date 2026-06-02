@@ -1199,18 +1199,25 @@ Acceptance:
 
 - user can reliably read, zoom, edit, replace, and delete cards
 
-### Milestone 5: Security and polish
+### Milestone 5: Security and polish — in progress
 
-Deliver:
+Delivered:
 
-- app lock
-- onboarding privacy notice
-- settings
+- first-run onboarding privacy notice
+- settings screen
+- app lock PIN storage via SecureStore
+- device authentication prompt support via LocalAuthentication
+- configurable background lock timeout
+- haptic setting
+- reduced motion setting
+
+Remaining:
+
+- native-device validation for app lock, SecureStore, and Face ID / biometric prompts
 - search/filter
 - empty states
 - error states
-- haptic setting
-- reduced motion setting
+- app-lock recovery/forgot-PIN guidance
 
 Acceptance:
 
@@ -1251,16 +1258,14 @@ Before implementation, decide:
 
 ## 24. Recommended next implementation task
 
-Move into **Milestone 5: Security and polish** after native-device validation of Milestone 4.
+Continue **Milestone 5: Security and polish**.
 
 Recommended next build:
 
 ```text
-src/features/security/
-  AppLockGate.tsx
-  PrivacyNoticeScreen.tsx
-
-src/app/settings.tsx
+src/features/search/
+  SearchFilterBar.tsx
+  useFilteredCards.ts
 ```
 
-Focus on onboarding privacy notice, configurable app lock timeout, haptic/reduced-motion settings, and search/filter polish before internal testing.
+Focus on search/filter, stronger empty/error states, and native-device validation for the app-lock flow before internal testing.

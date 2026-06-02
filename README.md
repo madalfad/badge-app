@@ -11,6 +11,9 @@ The current build includes:
 - Display/thumbnail image generation
 - Full-screen viewer with pinch, pan, double-tap zoom, front/back switching, favorites, archive, and high-contrast mode
 - Edit flow for metadata, front/back image replacement, optional back removal, and full-card deletion
+- First-run privacy notice
+- Settings screen for app lock, lock timeout, haptics, and reduced motion
+- Native app-lock foundation using SecureStore PIN storage and device authentication prompts
 
 ## Requirements
 

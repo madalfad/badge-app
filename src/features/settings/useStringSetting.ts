@@ -1,29 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useDatabaseContext } from "@/db/DatabaseProvider";
-import {
-  getBooleanSetting,
-  setBooleanSetting,
-} from "@/db/repositories/settingsRepository";
+import { getSetting, setSetting } from "@/db/repositories/settingsRepository";
 
 import { emitSettingChange, subscribeToSetting } from "./settingsEvents";
 
-type BooleanSettingUpdater = boolean | ((currentValue: boolean) => boolean);
+type StringSettingUpdater = string | ((currentValue: string) => string);
 
-export function useBooleanSetting(key: string, fallback: boolean) {
+export function useStringSetting(key: string, fallback: string) {
   const { db, isReady } = useDatabaseContext();
   const [value, setValue] = useState(fallback);
   const valueRef = useRef(fallback);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const updateValue = useCallback((nextValue: boolean) => {
+  const updateValue = useCallback((nextValue: string) => {
     valueRef.current = nextValue;
     setValue(nextValue);
   }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToSetting(key, (nextValue) => {
-      updateValue(nextValue === "true");
+      updateValue(nextValue);
       setIsLoaded(true);
     });
 
@@ -44,9 +41,9 @@ export function useBooleanSetting(key: string, fallback: boolean) {
         return;
       }
 
-      const persistedValue = await getBooleanSetting(db, key, fallback);
+      const persistedValue = await getSetting(db, key);
       if (isMounted) {
-        updateValue(persistedValue);
+        updateValue(persistedValue ?? fallback);
         setIsLoaded(true);
       }
     }
@@ -64,18 +61,17 @@ export function useBooleanSetting(key: string, fallback: boolean) {
   }, [db, fallback, isReady, key, updateValue]);
 
   const setPersistentValue = useCallback(
-    async (nextValueOrUpdater: BooleanSettingUpdater) => {
+    async (nextValueOrUpdater: StringSettingUpdater) => {
       const resolvedValue =
         typeof nextValueOrUpdater === "function"
           ? nextValueOrUpdater(valueRef.current)
           : nextValueOrUpdater;
 
       updateValue(resolvedValue);
-
-      emitSettingChange(key, resolvedValue ? "true" : "false");
+      emitSettingChange(key, resolvedValue);
 
       if (db) {
-        await setBooleanSetting(db, key, resolvedValue);
+        await setSetting(db, key, resolvedValue);
       }
     },
     [db, key, updateValue],

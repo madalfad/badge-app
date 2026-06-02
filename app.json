@@ -8,7 +8,10 @@
     "scheme": "badgeapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -61,6 +64,19 @@
         {
           "supportsOpeningDocumentsInPlace": false,
           "enableFileSharing": false
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Allow BadgeDeck to use Face ID to unlock your badge card library."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow BadgeDeck to use Face ID to unlock your badge card library."
         }
       ]
     ],

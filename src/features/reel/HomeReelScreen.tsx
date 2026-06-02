@@ -76,16 +76,28 @@ export function HomeReelScreen() {
             </Text>
           </View>
           <View style={styles.headerActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push("/add")}
-              style={({ pressed }) => [
-                styles.addButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.addButtonText}>+ Add</Text>
-            </Pressable>
+            <View style={styles.topButtonRow}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/settings")}
+                style={({ pressed }) => [
+                  styles.settingsButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.settingsButtonText}>Settings</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/add")}
+                style={({ pressed }) => [
+                  styles.addButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.addButtonText}>+ Add</Text>
+              </Pressable>
+            </View>
             <View style={styles.statsPill}>
               <Text style={styles.statsNumber}>{cards.length}</Text>
               <Text style={styles.statsLabel}>cards</Text>
@@ -310,6 +322,25 @@ const styles = StyleSheet.create({
   headerActions: {
     alignItems: "flex-end",
     gap: 10,
+  },
+  topButtonRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  settingsButton: {
+    borderRadius: 999,
+    backgroundColor: "#17243A",
+    borderWidth: 1,
+    borderColor: "#26364F",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  settingsButtonText: {
+    color: "#CBD5E1",
+    fontSize: 13,
+    fontWeight: "900",
   },
   addButton: {
     borderRadius: 999,
