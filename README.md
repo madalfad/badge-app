@@ -14,8 +14,10 @@ The current build includes:
 - First-run privacy notice
 - Settings screen for app lock, lock timeout, haptics, and reduced motion
 - Native app-lock foundation using SecureStore PIN storage and device authentication prompts
-- Local search and filters for favorites, categories, and tags
+- Local search and filters for favorites, recently viewed, archived, categories, and tags
 - Search result list plus empty/error state messaging
+- Archived card recovery from the viewer
+- App-lock recovery/forgot-PIN guidance
 
 ## Requirements
 
@@ -42,7 +44,7 @@ npx expo start --web
 For Android/iOS native testing, build and run a development client:
 
 ```bash
-npx eas build --profile development --platform android
+npm exec --package eas-cli -- eas build --profile development --platform android
 npx expo start --dev-client
 ```
 

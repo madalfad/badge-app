@@ -54,10 +54,17 @@ export function HomeReelScreen() {
   );
 
   const favoriteCount = useMemo(
-    () => cards.filter((card) => card.isFavorite).length,
+    () => cards.filter((card) => card.isFavorite && !card.isArchived).length,
     [cards],
   );
-  const { categories, filteredCards, isFiltering, tags } = useFilteredCards({
+  const {
+    activeCards,
+    archivedCards,
+    categories,
+    filteredCards,
+    isFiltering,
+    tags,
+  } = useFilteredCards({
     cards,
     filter: cardFilter,
     query: searchQuery,
@@ -112,8 +119,8 @@ export function HomeReelScreen() {
               </Pressable>
             </View>
             <View style={styles.statsPill}>
-              <Text style={styles.statsNumber}>{cards.length}</Text>
-              <Text style={styles.statsLabel}>cards</Text>
+              <Text style={styles.statsNumber}>{activeCards.length}</Text>
+              <Text style={styles.statsLabel}>active</Text>
             </View>
           </View>
         </View>
@@ -171,6 +178,15 @@ export function HomeReelScreen() {
               actionLabel="Add card"
               onAction={() => router.push("/add")}
             />
+          ) : filteredCards.length === 0 &&
+            !isFiltering &&
+            archivedCards.length > 0 ? (
+            <StatePanel
+              title="No active cards"
+              text="All cards are archived. Use the Archived filter to review or restore them."
+              actionLabel="View archived"
+              onAction={() => setCardFilter({ type: "archived" })}
+            />
           ) : filteredCards.length === 0 ? (
             <StatePanel
               title="No matching cards"
@@ -190,7 +206,7 @@ export function HomeReelScreen() {
             />
           ) : (
             <BadgeReel
-              cards={cards}
+              cards={filteredCards}
               hapticsEnabled={hapticsEnabled}
               reduceMotion={reduceMotion}
               onCardLongPress={setQuickActionCard}
@@ -209,6 +225,11 @@ export function HomeReelScreen() {
           </Text>
           <View style={styles.footerStatsRow}>
             <Text style={styles.footerStat}>{favoriteCount} favorites</Text>
+            {archivedCards.length > 0 ? (
+              <Text style={styles.footerStat}>
+                {archivedCards.length} archived
+              </Text>
+            ) : null}
             <Text style={styles.footerStat}>
               {isPersisted ? "SQLite backed" : "Demo fallback"}
             </Text>

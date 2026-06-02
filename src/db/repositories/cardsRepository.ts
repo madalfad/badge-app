@@ -66,6 +66,8 @@ function mapCardRowToBadgeCard(row: CardRow): BadgeCard {
     sections: notes.sections ?? [],
     footer: notes.footer ?? "Reference only • verify local protocol",
     isFavorite: row.is_favorite === 1,
+    isArchived: row.is_archived === 1,
+    lastViewedAt: row.last_viewed_at,
     frontThumbnailUri: row.primary_thumbnail_uri,
     frontDisplayUri: row.primary_display_uri,
     frontFileUri: row.primary_file_uri,
@@ -111,11 +113,18 @@ LEFT JOIN card_assets AS primary_asset ON primary_asset.id = (
 )
 `;
 
-export async function listCards(db: AppDatabase) {
+type ListCardsOptions = {
+  includeArchived?: boolean;
+};
+
+export async function listCards(
+  db: AppDatabase,
+  options: ListCardsOptions = {},
+) {
   const rows = await db.getAllAsync<CardRow>(
     `${CARD_SELECT}
-     WHERE cards.is_archived = 0
-     ORDER BY cards.sort_order ASC, cards.created_at ASC`,
+     ${options.includeArchived ? "" : "WHERE cards.is_archived = 0"}
+     ORDER BY cards.is_archived ASC, cards.sort_order ASC, cards.created_at ASC`,
   );
   return rows.map(mapCardRowToBadgeCard);
 }

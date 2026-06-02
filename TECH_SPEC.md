@@ -1199,7 +1199,7 @@ Acceptance:
 
 - user can reliably read, zoom, edit, replace, and delete cards
 
-### Milestone 5: Security and polish — in progress
+### Milestone 5: Security and polish — implemented, pending native-device validation
 
 Delivered:
 
@@ -1212,15 +1212,16 @@ Delivered:
 - reduced motion setting
 - local search across loaded card summaries
 - favorites/category/tag filters
+- recently viewed and archived filters
+- archived card recovery from viewer
 - flat search results list
-- no-cards and no-results empty states
+- no-cards, no-active-cards, and no-results empty states
 - visible database/demo-fallback error messaging
+- app-lock recovery/forgot-PIN guidance
 
 Remaining:
 
 - native-device validation for app lock, SecureStore, and Face ID / biometric prompts
-- recently viewed and archived filters
-- app-lock recovery/forgot-PIN guidance
 
 Acceptance:
 
@@ -1261,16 +1262,16 @@ Before implementation, decide:
 
 ## 24. Recommended next implementation task
 
-Continue **Milestone 5: Security and polish**.
+Prepare for internal testing.
 
 Recommended next build:
 
 ```text
-src/features/security/
-  AppLockRecoveryNotice.tsx
-
-src/features/search/
-  recent/archive filters
+manual validation / internal test prep
+  - rebuild development client
+  - validate app lock on device
+  - validate add/edit/delete/archive/restore on device
+  - decide whether to add an export/backup workflow before broader testing
 ```
 
-Focus on native-device validation for the app-lock flow, app-lock recovery guidance, and recently viewed/archived filters before internal testing.
+Focus on native-device validation for SecureStore, Face ID / biometric prompts, image import, and file cleanup before TestFlight/internal distribution.

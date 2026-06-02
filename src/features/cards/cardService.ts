@@ -257,6 +257,10 @@ export async function archiveCardRecord(db: AppDatabase, cardId: string) {
   await archiveCard(db, cardId);
 }
 
+export async function restoreCardRecord(db: AppDatabase, cardId: string) {
+  await updateCard(db, cardId, { isArchived: false });
+}
+
 export async function deleteCardRecordAndFiles(
   db: AppDatabase,
   cardId: string,

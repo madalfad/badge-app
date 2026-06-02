@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppLockRecoveryNotice } from "./AppLockRecoveryNotice";
 import {
   authenticateWithDevice,
   getDeviceAuthAvailability,
@@ -150,6 +151,8 @@ export function AppLockPrompt({ storedPin, onUnlock }: AppLockPromptProps) {
               {deviceAuth?.detail ?? "Checking device unlock support…"}
             </Text>
           )}
+
+          <AppLockRecoveryNotice compact />
         </View>
       </View>
     </SafeAreaView>

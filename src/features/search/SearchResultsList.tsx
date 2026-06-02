@@ -42,6 +42,22 @@ type SearchResultItemProps = {
   onFavoriteToggle: () => void;
 };
 
+function formatViewedAt(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const viewedAt = new Date(value);
+  if (Number.isNaN(viewedAt.getTime())) {
+    return null;
+  }
+
+  return viewedAt.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function SearchResultItem({
   card,
   onPress,
@@ -50,6 +66,7 @@ function SearchResultItem({
 }: SearchResultItemProps) {
   const imageUri =
     card.frontThumbnailUri ?? card.frontDisplayUri ?? card.frontFileUri ?? null;
+  const viewedLabel = formatViewedAt(card.lastViewedAt);
 
   return (
     <Pressable
@@ -59,7 +76,9 @@ function SearchResultItem({
       onPress={onPress}
       style={({ pressed }) => [styles.item, pressed && styles.pressed]}
     >
-      <View style={[styles.thumbnail, { borderColor: `${card.accentColor}99` }]}>
+      <View
+        style={[styles.thumbnail, { borderColor: `${card.accentColor}99` }]}
+      >
         {imageUri ? (
           <Image
             source={{ uri: imageUri }}
@@ -81,7 +100,9 @@ function SearchResultItem({
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={card.isFavorite ? "Remove favorite" : "Add favorite"}
+            accessibilityLabel={
+              card.isFavorite ? "Remove favorite" : "Add favorite"
+            }
             onPress={(event) => {
               event.stopPropagation();
               onFavoriteToggle();
@@ -102,6 +123,12 @@ function SearchResultItem({
           {card.subtitle || "Imported reference image"}
         </Text>
         <View style={styles.metaRow}>
+          {card.isArchived ? (
+            <Text style={styles.archivePill}>Archived</Text>
+          ) : null}
+          {viewedLabel ? (
+            <Text style={styles.pill}>Viewed {viewedLabel}</Text>
+          ) : null}
           <Text style={[styles.pill, { color: card.accentColor }]}>
             {card.category}
           </Text>
@@ -192,6 +219,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "#17243A",
     color: "#CBD5E1",
+    fontSize: 11,
+    fontWeight: "900",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  archivePill: {
+    overflow: "hidden",
+    borderRadius: 999,
+    backgroundColor: "#FBBF241F",
+    color: "#FDE68A",
     fontSize: 11,
     fontWeight: "900",
     paddingHorizontal: 9,

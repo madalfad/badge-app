@@ -26,6 +26,13 @@ function toggleFavoriteInMemory(cards: BadgeCard[], cardId: string) {
   );
 }
 
+function markViewedInMemory(cards: BadgeCard[], cardId: string) {
+  const viewedAt = new Date().toISOString();
+  return cards.map((card) =>
+    card.id === cardId ? { ...card, lastViewedAt: viewedAt } : card,
+  );
+}
+
 export function useCards(): UseCardsResult {
   const { db, error: databaseError, isReady } = useDatabaseContext();
   const [cards, setCards] = useState<BadgeCard[]>([]);
@@ -45,7 +52,7 @@ export function useCards(): UseCardsResult {
         return;
       }
 
-      const nextCards = await listCards(db);
+      const nextCards = await listCards(db, { includeArchived: true });
       setCards(nextCards.length > 0 ? nextCards : sampleBadgeCards);
       setLoadError(null);
     } catch (caughtError) {
@@ -90,6 +97,8 @@ export function useCards(): UseCardsResult {
 
   const markCardViewed = useCallback(
     async (cardId: string) => {
+      setCards((currentCards) => markViewedInMemory(currentCards, cardId));
+
       if (!db) {
         return;
       }

@@ -13,6 +13,8 @@ export type BadgeCard = {
   sections: BadgeCardSection[];
   footer: string;
   isFavorite: boolean;
+  isArchived?: boolean;
+  lastViewedAt?: string | null;
   frontThumbnailUri?: string | null;
   frontDisplayUri?: string | null;
   frontFileUri?: string | null;

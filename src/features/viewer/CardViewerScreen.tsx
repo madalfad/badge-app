@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useDatabaseContext } from "@/db/DatabaseProvider";
 import {
   archiveCardRecord,
+  restoreCardRecord,
   toggleCardFavorite,
 } from "@/features/cards/cardService";
 import { useCard } from "@/features/cards/useCard";
@@ -89,7 +90,7 @@ export function CardViewerScreen() {
 
     Alert.alert(
       "Archive card?",
-      "Archived cards are hidden from the main reel.",
+      "Archived cards are hidden from the main reel but can be restored from the Archived filter.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -108,6 +109,20 @@ export function CardViewerScreen() {
       ],
     );
   }, [cardId, db, router]);
+
+  const restoreCard = useCallback(async () => {
+    if (!db || !cardId) {
+      return;
+    }
+
+    setIsMutating(true);
+    try {
+      await restoreCardRecord(db, cardId);
+      await reload();
+    } finally {
+      setIsMutating(false);
+    }
+  }, [cardId, db, reload]);
 
   if (isLoading) {
     return (
@@ -240,6 +255,7 @@ export function CardViewerScreen() {
                 }
               />
               {highContrast ? <InfoPill label="High contrast" /> : null}
+              {card.isArchived ? <InfoPill label="Archived" /> : null}
               {tags.map((tag) => (
                 <InfoPill key={tag} label={`#${tag}`} />
               ))}
@@ -270,12 +286,20 @@ export function CardViewerScreen() {
                   }
                 }}
               />
-              <ViewerAction
-                label="Archive"
-                onPress={archiveCard}
-                disabled={isMutating}
-                danger
-              />
+              {card.isArchived ? (
+                <ViewerAction
+                  label="Restore"
+                  onPress={restoreCard}
+                  disabled={isMutating}
+                />
+              ) : (
+                <ViewerAction
+                  label="Archive"
+                  onPress={archiveCard}
+                  disabled={isMutating}
+                  danger
+                />
+              )}
             </ScrollView>
           </View>
         </SafeAreaView>

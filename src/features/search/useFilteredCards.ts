@@ -5,6 +5,8 @@ import type { BadgeCard } from "@/features/cards/types";
 export type CardFilter =
   | { type: "all" }
   | { type: "favorites" }
+  | { type: "recent" }
+  | { type: "archived" }
   | { type: "category"; value: string }
   | { type: "tag"; value: string };
 
@@ -40,8 +42,20 @@ function includesQuery(card: BadgeCard, query: string) {
 }
 
 function matchesFilter(card: BadgeCard, filter: CardFilter) {
+  if (filter.type === "archived") {
+    return Boolean(card.isArchived);
+  }
+
+  if (card.isArchived) {
+    return false;
+  }
+
   if (filter.type === "favorites") {
     return card.isFavorite;
+  }
+
+  if (filter.type === "recent") {
+    return Boolean(card.lastViewedAt);
   }
 
   if (filter.type === "category") {
@@ -49,37 +63,73 @@ function matchesFilter(card: BadgeCard, filter: CardFilter) {
   }
 
   if (filter.type === "tag") {
-    return (card.tags ?? []).some((tag) => normalize(tag) === normalize(filter.value));
+    return (card.tags ?? []).some(
+      (tag) => normalize(tag) === normalize(filter.value),
+    );
   }
 
   return true;
 }
 
 function getUniqueSorted(values: string[]) {
-  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort(
-    (left, right) => left.localeCompare(right),
-  );
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter(Boolean)),
+  ).sort((left, right) => left.localeCompare(right));
 }
 
-export function useFilteredCards({ cards, query, filter }: UseFilteredCardsInput) {
-  const categories = useMemo(
-    () => getUniqueSorted(cards.map((card) => card.category)),
+function sortFilteredCards(cards: BadgeCard[], filter: CardFilter) {
+  if (filter.type !== "recent") {
+    return cards;
+  }
+
+  return [...cards].sort((left, right) => {
+    const leftTime = left.lastViewedAt ? Date.parse(left.lastViewedAt) : 0;
+    const rightTime = right.lastViewedAt ? Date.parse(right.lastViewedAt) : 0;
+    return rightTime - leftTime;
+  });
+}
+
+export function useFilteredCards({
+  cards,
+  query,
+  filter,
+}: UseFilteredCardsInput) {
+  const activeCards = useMemo(
+    () => cards.filter((card) => !card.isArchived),
     [cards],
+  );
+
+  const archivedCards = useMemo(
+    () => cards.filter((card) => card.isArchived),
+    [cards],
+  );
+
+  const categories = useMemo(
+    () => getUniqueSorted(activeCards.map((card) => card.category)),
+    [activeCards],
   );
 
   const tags = useMemo(
-    () => getUniqueSorted(cards.flatMap((card) => card.tags ?? [])),
-    [cards],
+    () => getUniqueSorted(activeCards.flatMap((card) => card.tags ?? [])),
+    [activeCards],
   );
 
   const filteredCards = useMemo(
-    () => cards.filter((card) => matchesFilter(card, filter) && includesQuery(card, query)),
+    () =>
+      sortFilteredCards(
+        cards.filter(
+          (card) => matchesFilter(card, filter) && includesQuery(card, query),
+        ),
+        filter,
+      ),
     [cards, filter, query],
   );
 
   const isFiltering = query.trim().length > 0 || filter.type !== "all";
 
   return {
+    activeCards,
+    archivedCards,
     categories,
     filteredCards,
     isFiltering,

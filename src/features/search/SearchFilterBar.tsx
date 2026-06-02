@@ -61,7 +61,10 @@ export function SearchFilterBar({
               onQueryChange("");
               onFilterChange({ type: "all" });
             }}
-            style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.clearButton,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={styles.clearButtonText}>Clear</Text>
           </Pressable>
@@ -83,12 +86,24 @@ export function SearchFilterBar({
           selected={activeFilterKey === "favorites"}
           onPress={() => onFilterChange({ type: "favorites" })}
         />
+        <FilterChip
+          label="Recent"
+          selected={activeFilterKey === "recent"}
+          onPress={() => onFilterChange({ type: "recent" })}
+        />
+        <FilterChip
+          label="Archived"
+          selected={activeFilterKey === "archived"}
+          onPress={() => onFilterChange({ type: "archived" })}
+        />
         {categories.map((category) => (
           <FilterChip
             key={`category:${category}`}
             label={category}
             selected={activeFilterKey === `category:${category}`}
-            onPress={() => onFilterChange({ type: "category", value: category })}
+            onPress={() =>
+              onFilterChange({ type: "category", value: category })
+            }
           />
         ))}
         {tags.map((tag) => (
@@ -128,7 +143,12 @@ function FilterChip({ label, selected, onPress }: FilterChipProps) {
         pressed && styles.pressed,
       ]}
     >
-      <Text style={[styles.filterChipText, selected && styles.filterChipTextSelected]}>
+      <Text
+        style={[
+          styles.filterChipText,
+          selected && styles.filterChipTextSelected,
+        ]}
+      >
         {label}
       </Text>
     </Pressable>

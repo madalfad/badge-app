@@ -14,6 +14,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
+import { AppLockRecoveryNotice } from "@/features/security/AppLockRecoveryNotice";
+
 import { useBooleanSetting } from "./useBooleanSetting";
 import { useStringSetting } from "./useStringSetting";
 import {
@@ -87,7 +89,9 @@ export function SettingsScreen() {
     setSecurityError(null);
 
     if (Platform.OS === "web") {
-      setSecurityError("App lock secure storage is available in native builds.");
+      setSecurityError(
+        "App lock secure storage is available in native builds.",
+      );
       return;
     }
 
@@ -275,6 +279,8 @@ export function SettingsScreen() {
               {deviceAuth?.detail ?? "Checking device authentication support…"}
             </Text>
           </View>
+
+          <AppLockRecoveryNotice />
         </View>
 
         <View style={styles.section}>
@@ -348,7 +354,12 @@ type SegmentButtonProps = {
   onPress: () => void;
 };
 
-function SegmentButton({ label, selected, disabled, onPress }: SegmentButtonProps) {
+function SegmentButton({
+  label,
+  selected,
+  disabled,
+  onPress,
+}: SegmentButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
