@@ -1175,7 +1175,7 @@ Acceptance:
 
 - user can add a real card and see it in reel in a native development build
 
-### Milestone 4: Viewer MVP — partially complete
+### Milestone 4: Viewer/Edit polish — implemented, pending native-device validation
 
 Delivered:
 
@@ -1184,15 +1184,20 @@ Delivered:
 - pinch/pan/double-tap zoom
 - favorite/archive controls
 - high-contrast background toggle
+- metadata editing route
+- front/back image replacement flow
+- optional back-side removal
+- full-card deletion with local file cleanup
+- stronger pan-bound clamping based on measured image/container size
 
 Remaining:
 
-- edit metadata/assets flow
-- stronger pan-bound clamping based on measured image/container size
+- validate image replacement and deletion on native development builds
+- tune gesture feel after device testing
 
 Acceptance:
 
-- user can reliably read and zoom cards
+- user can reliably read, zoom, edit, replace, and delete cards
 
 ### Milestone 5: Security and polish
 
@@ -1246,17 +1251,16 @@ Before implementation, decide:
 
 ## 24. Recommended next implementation task
 
-Finish **Milestone 4: Viewer/Edit polish**, then move into Milestone 5.
+Move into **Milestone 5: Security and polish** after native-device validation of Milestone 4.
 
 Recommended next build:
 
 ```text
-src/features/edit-card/
-  EditCardScreen.tsx
-  AssetReplacementPanel.tsx
-  MetadataForm.tsx
+src/features/security/
+  AppLockGate.tsx
+  PrivacyNoticeScreen.tsx
 
-src/app/card/[id]/edit.tsx
+src/app/settings.tsx
 ```
 
-Focus on metadata editing, replacing front/back images, deleting cards/files safely, and tightening viewer pan bounds before app-lock/security work.
+Focus on onboarding privacy notice, configurable app lock timeout, haptic/reduced-motion settings, and search/filter polish before internal testing.

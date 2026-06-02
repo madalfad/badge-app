@@ -157,6 +157,15 @@ export function HomeReelScreen() {
             setQuickActionCard(null);
           }
         }}
+        onEdit={() => {
+          if (quickActionCard) {
+            router.push({
+              pathname: "/card/[id]/edit",
+              params: { id: quickActionCard.id },
+            });
+            setQuickActionCard(null);
+          }
+        }}
       />
     </View>
   );
@@ -197,6 +206,7 @@ type QuickActionsModalProps = {
   onClose: () => void;
   onFavorite: () => void;
   onOpen: () => void;
+  onEdit: () => void;
 };
 
 function QuickActionsModal({
@@ -204,6 +214,7 @@ function QuickActionsModal({
   onClose,
   onFavorite,
   onOpen,
+  onEdit,
 }: QuickActionsModalProps) {
   return (
     <Modal
@@ -232,7 +243,7 @@ function QuickActionsModal({
                 label={card.isFavorite ? "Remove favorite" : "Add favorite"}
                 onPress={onFavorite}
               />
-              <ActionButton label="Edit metadata" onPress={onClose} />
+              <ActionButton label="Edit card" onPress={onEdit} />
             </ScrollView>
           </View>
         )}

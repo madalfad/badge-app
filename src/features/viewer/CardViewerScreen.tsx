@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -47,8 +47,22 @@ export function CardViewerScreen() {
   const placeholderUri = activeAsset?.thumbnailUri ?? null;
   const availableSides = useMemo(
     () =>
-      assets.filter((asset) => asset.side === "front" || asset.side === "back"),
+      assets
+        .filter((asset) => asset.side === "front" || asset.side === "back")
+        .sort((left, right) => {
+          const sideOrder = { front: 0, back: 1 } as const;
+          return (
+            sideOrder[left.side as "front" | "back"] -
+            sideOrder[right.side as "front" | "back"]
+          );
+        }),
     [assets],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload]),
   );
 
   const toggleFavorite = useCallback(async () => {
@@ -128,6 +142,8 @@ export function CardViewerScreen() {
           uri={activeImageUri}
           placeholderUri={placeholderUri}
           highContrast={highContrast}
+          imageWidth={activeAsset?.width}
+          imageHeight={activeAsset?.height}
           onSingleTap={() => setControlsVisible((visible) => !visible)}
         />
       ) : (
@@ -244,13 +260,15 @@ export function CardViewerScreen() {
                 disabled={isMutating}
               />
               <ViewerAction
-                label="Edit metadata"
-                onPress={() =>
-                  Alert.alert(
-                    "Edit flow coming next",
-                    "Metadata editing is planned as the next workflow.",
-                  )
-                }
+                label="Edit card"
+                onPress={() => {
+                  if (cardId) {
+                    router.push({
+                      pathname: "/card/[id]/edit",
+                      params: { id: cardId },
+                    });
+                  }
+                }}
               />
               <ViewerAction
                 label="Archive"

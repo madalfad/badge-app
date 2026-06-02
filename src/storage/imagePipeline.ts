@@ -30,6 +30,10 @@ export type ProcessedCardAsset = {
   cropDataJson: string | null;
 };
 
+type ProcessAndStoreCardImageOptions = {
+  fileNamePrefix?: string;
+};
+
 type ResizeTarget = {
   width?: number | null;
   height?: number | null;
@@ -216,6 +220,7 @@ export async function processAndStoreCardImage(
   cardId: string,
   side: CardImageSide,
   source: SourceCardImage,
+  options: ProcessAndStoreCardImageOptions = {},
 ): Promise<ProcessedCardAsset> {
   const rotation = normalizeRotation(source.rotateDegrees);
   const rotatedDimensions = dimensionsAfterRotation(
@@ -241,10 +246,11 @@ export async function processAndStoreCardImage(
       : null;
 
   const originalExtension = getOriginalExtension(source);
+  const fileNamePrefix = options.fileNamePrefix ?? side;
   const originalUri = await copyFileToCardDirectory(
     source.uri,
     cardId,
-    `${side}-original.${originalExtension}`,
+    `${fileNamePrefix}-original.${originalExtension}`,
   );
 
   const display = await renderVariant(
@@ -263,12 +269,12 @@ export async function processAndStoreCardImage(
   const displayUri = await copyFileToCardDirectory(
     display.uri,
     cardId,
-    `${side}-display.jpg`,
+    `${fileNamePrefix}-display.jpg`,
   );
   const thumbnailUri = await copyFileToCardDirectory(
     thumbnail.uri,
     cardId,
-    `${side}-thumb.jpg`,
+    `${fileNamePrefix}-thumb.jpg`,
   );
 
   await deleteCacheFile(display.uri);

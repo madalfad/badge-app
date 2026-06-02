@@ -25,6 +25,7 @@ export default function RootLayout() {
               options={{ presentation: "modal" }}
             />
             <Stack.Screen name="card/[id]" />
+            <Stack.Screen name="card/[id]/edit" />
           </Stack>
         </DatabaseProvider>
       </ThemeProvider>

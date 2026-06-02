@@ -1,20 +1,87 @@
-import { Image } from 'expo-image';
-import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Image } from "expo-image";
+import { useEffect } from "react";
+import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 
 function clamp(value: number, min: number, max: number) {
-  'worklet';
+  "worklet";
   return Math.min(Math.max(value, min), max);
+}
+
+function getContainedSize(
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+) {
+  "worklet";
+
+  if (
+    containerWidth <= 0 ||
+    containerHeight <= 0 ||
+    imageWidth <= 0 ||
+    imageHeight <= 0
+  ) {
+    return { width: containerWidth, height: containerHeight };
+  }
+
+  const imageAspectRatio = imageWidth / imageHeight;
+  const containerAspectRatio = containerWidth / containerHeight;
+
+  if (imageAspectRatio >= containerAspectRatio) {
+    return {
+      width: containerWidth,
+      height: containerWidth / imageAspectRatio,
+    };
+  }
+
+  return {
+    width: containerHeight * imageAspectRatio,
+    height: containerHeight,
+  };
+}
+
+function getMaxTranslateX(
+  scale: number,
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+) {
+  "worklet";
+  const containedSize = getContainedSize(
+    containerWidth,
+    containerHeight,
+    imageWidth,
+    imageHeight,
+  );
+  return Math.max(0, (containedSize.width * scale - containerWidth) / 2);
+}
+
+function getMaxTranslateY(
+  scale: number,
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+) {
+  "worklet";
+  const containedSize = getContainedSize(
+    containerWidth,
+    containerHeight,
+    imageWidth,
+    imageHeight,
+  );
+  return Math.max(0, (containedSize.height * scale - containerHeight) / 2);
 }
 
 type ZoomableImageProps = {
@@ -22,38 +89,118 @@ type ZoomableImageProps = {
   placeholderUri?: string | null;
   onSingleTap: () => void;
   highContrast: boolean;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
 };
 
-export function ZoomableImage({ uri, placeholderUri, onSingleTap, highContrast }: ZoomableImageProps) {
+export function ZoomableImage({
+  uri,
+  placeholderUri,
+  onSingleTap,
+  highContrast,
+  imageWidth,
+  imageHeight,
+}: ZoomableImageProps) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+  const containerWidth = useSharedValue(0);
+  const containerHeight = useSharedValue(0);
+  const naturalImageWidth = useSharedValue(imageWidth ?? 0);
+  const naturalImageHeight = useSharedValue(imageHeight ?? 0);
 
   useEffect(() => {
+    naturalImageWidth.value = imageWidth ?? 0;
+    naturalImageHeight.value = imageHeight ?? 0;
     scale.value = withTiming(1);
     savedScale.value = 1;
     translateX.value = withTiming(0);
     translateY.value = withTiming(0);
     savedTranslateX.value = 0;
     savedTranslateY.value = 0;
-  }, [savedScale, savedTranslateX, savedTranslateY, scale, translateX, translateY, uri]);
+  }, [
+    imageHeight,
+    imageWidth,
+    naturalImageHeight,
+    naturalImageWidth,
+    savedScale,
+    savedTranslateX,
+    savedTranslateY,
+    scale,
+    translateX,
+    translateY,
+    uri,
+  ]);
+
+  const handleContainerLayout = (event: LayoutChangeEvent) => {
+    containerWidth.value = event.nativeEvent.layout.width;
+    containerHeight.value = event.nativeEvent.layout.height;
+  };
 
   const pinchGesture = Gesture.Pinch()
     .onBegin(() => {
       savedScale.value = scale.value;
     })
     .onUpdate((event) => {
-      scale.value = clamp(savedScale.value * event.scale, MIN_SCALE, MAX_SCALE);
+      const nextScale = clamp(
+        savedScale.value * event.scale,
+        MIN_SCALE,
+        MAX_SCALE,
+      );
+      const maxX = getMaxTranslateX(
+        nextScale,
+        containerWidth.value,
+        containerHeight.value,
+        naturalImageWidth.value,
+        naturalImageHeight.value,
+      );
+      const maxY = getMaxTranslateY(
+        nextScale,
+        containerWidth.value,
+        containerHeight.value,
+        naturalImageWidth.value,
+        naturalImageHeight.value,
+      );
+
+      scale.value = nextScale;
+      translateX.value = clamp(translateX.value, -maxX, maxX);
+      translateY.value = clamp(translateY.value, -maxY, maxY);
     })
     .onEnd(() => {
       if (scale.value <= 1.03) {
         scale.value = withTiming(1);
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
+        savedScale.value = 1;
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+        return;
       }
+
+      const maxX = getMaxTranslateX(
+        scale.value,
+        containerWidth.value,
+        containerHeight.value,
+        naturalImageWidth.value,
+        naturalImageHeight.value,
+      );
+      const maxY = getMaxTranslateY(
+        scale.value,
+        containerWidth.value,
+        containerHeight.value,
+        naturalImageWidth.value,
+        naturalImageHeight.value,
+      );
+      const nextX = clamp(translateX.value, -maxX, maxX);
+      const nextY = clamp(translateY.value, -maxY, maxY);
+
+      translateX.value = withTiming(nextX);
+      translateY.value = withTiming(nextY);
+      savedTranslateX.value = nextX;
+      savedTranslateY.value = nextY;
       savedScale.value = scale.value;
     });
 
@@ -63,15 +210,43 @@ export function ZoomableImage({ uri, placeholderUri, onSingleTap, highContrast }
       savedTranslateY.value = translateY.value;
     })
     .onUpdate((event) => {
-      const maxOffset = 180 * Math.max(scale.value - 1, 0);
-      translateX.value = clamp(savedTranslateX.value + event.translationX, -maxOffset, maxOffset);
-      translateY.value = clamp(savedTranslateY.value + event.translationY, -maxOffset, maxOffset);
+      const maxX = getMaxTranslateX(
+        scale.value,
+        containerWidth.value,
+        containerHeight.value,
+        naturalImageWidth.value,
+        naturalImageHeight.value,
+      );
+      const maxY = getMaxTranslateY(
+        scale.value,
+        containerWidth.value,
+        containerHeight.value,
+        naturalImageWidth.value,
+        naturalImageHeight.value,
+      );
+
+      translateX.value = clamp(
+        savedTranslateX.value + event.translationX,
+        -maxX,
+        maxX,
+      );
+      translateY.value = clamp(
+        savedTranslateY.value + event.translationY,
+        -maxY,
+        maxY,
+      );
     })
     .onEnd(() => {
       if (scale.value <= 1.03) {
         translateX.value = withTiming(0);
         translateY.value = withTiming(0);
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+        return;
       }
+
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
     });
 
   const doubleTapGesture = Gesture.Tap()
@@ -104,17 +279,31 @@ export function ZoomableImage({ uri, placeholderUri, onSingleTap, highContrast }
     Gesture.Exclusive(doubleTapGesture, singleTapGesture),
   );
 
-  const animatedImageStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-  }));
+  const animatedImageStyle = useAnimatedStyle(() => {
+    const containedSize = getContainedSize(
+      containerWidth.value,
+      containerHeight.value,
+      naturalImageWidth.value,
+      naturalImageHeight.value,
+    );
+
+    return {
+      width: containedSize.width,
+      height: containedSize.height,
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { scale: scale.value },
+      ],
+    };
+  });
 
   return (
     <GestureDetector gesture={gesture}>
-      <View style={[styles.container, highContrast && styles.highContrastContainer]}>
+      <View
+        onLayout={handleContainerLayout}
+        style={[styles.container, highContrast && styles.highContrastContainer]}
+      >
         <Animated.View style={[styles.imageWrap, animatedImageStyle]}>
           <Image
             source={{ uri }}
@@ -132,17 +321,19 @@ export function ZoomableImage({ uri, placeholderUri, onSingleTap, highContrast }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    overflow: 'hidden',
-    backgroundColor: '#07111F',
+    overflow: "hidden",
+    backgroundColor: "#07111F",
+    alignItems: "center",
+    justifyContent: "center",
   },
   highContrastContainer: {
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
   },
   imageWrap: {
-    flex: 1,
+    overflow: "hidden",
   },
   image: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
 });

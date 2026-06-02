@@ -10,6 +10,7 @@ The current build includes:
 - Camera/photo-library import for front and optional back card images
 - Display/thumbnail image generation
 - Full-screen viewer with pinch, pan, double-tap zoom, front/back switching, favorites, archive, and high-contrast mode
+- Edit flow for metadata, front/back image replacement, optional back removal, and full-card deletion
 
 ## Requirements
 
