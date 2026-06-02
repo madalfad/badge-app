@@ -2,13 +2,14 @@
 
 ## 1. Product goal
 
-Build an offline-first Expo app for healthcare professionals to store, organize, and rapidly view digital copies of badge reference cards. The defining feature is a **fluid 3D badge reel** interface that feels like scrolling through physical laminated cards on a badge holder.
+Build an offline-first Expo app for healthcare professionals to store, organize, and rapidly view digital copies of badge reference cards. The defining feature is a **fluid 3D badge reel** interface that feels like scrolling through physical laminated cards on a badge holder. After the single-reel MVP is validated, users should be able to create multiple local reels and sort badges into those reels.
 
 Primary success criteria:
 
 - Users can add a front/back reference card from camera or photo library.
 - Cards are stored locally and available offline.
 - The home screen renders a smooth animated badge-card reel.
+- Users can switch between multiple local reels once the post-MVP organization milestone is implemented.
 - Users can open a card instantly into a zoomable full-screen viewer.
 - App supports app lock with biometric/device authentication.
 - MVP avoids cloud sync and avoids storing PHI by design.
@@ -225,6 +226,8 @@ On launch:
 | Route | Purpose |
 |---|---|
 | `(app)/index` | 3D badge reel home |
+| `(app)/reels` | Future local reel manager/list |
+| `(app)/reels/[id]/edit` | Future create/edit local reel metadata and membership |
 | `(app)/search` | Search overlay/modal |
 | `(app)/card/[id]` | Full-screen card viewer |
 | `(app)/card/[id]/edit` | Edit title/category/tags/assets |
@@ -263,6 +266,41 @@ CREATE TABLE cards (
   FOREIGN KEY (category_id) REFERENCES categories(id)
 );
 ```
+
+#### Future `reels`
+
+Post-MVP local organization adds user-created reels. These are local-only containers, not cloud/shared decks.
+
+```sql
+CREATE TABLE reels (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  color TEXT,
+  icon TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+#### Future `reel_cards`
+
+Cards can belong to more than one reel. This supports a badge appearing in both, for example, “ICU” and “Favorites for shift” without duplicating image files.
+
+```sql
+CREATE TABLE reel_cards (
+  reel_id TEXT NOT NULL,
+  card_id TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT NOT NULL,
+  PRIMARY KEY (reel_id, card_id),
+  FOREIGN KEY (reel_id) REFERENCES reels(id) ON DELETE CASCADE,
+  FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+);
+```
+
+Migration note: create a default reel, backfill existing non-archived cards into it, and preserve the current `cards.sort_order` as the default reel order.
 
 #### `card_assets`
 
@@ -365,6 +403,10 @@ CREATE INDEX idx_cards_sort_order ON cards(sort_order);
 CREATE INDEX idx_card_assets_card_id ON card_assets(card_id);
 CREATE INDEX idx_card_assets_side ON card_assets(card_id, side);
 CREATE INDEX idx_card_tags_tag_id ON card_tags(tag_id);
+-- Future multi-reel indexes
+CREATE INDEX idx_reels_sort_order ON reels(sort_order);
+CREATE INDEX idx_reel_cards_card_id ON reel_cards(card_id);
+CREATE INDEX idx_reel_cards_order ON reel_cards(reel_id, sort_order);
 ```
 
 ---
@@ -492,6 +534,33 @@ markViewed(id)
 searchCards(query, filters)
 ```
 
+### Future `ReelsRepository`
+
+Required for the post-MVP local multi-reel milestone:
+
+```ts
+listReels()
+getReelById(id)
+createReel(input)
+updateReel(id, patch)
+archiveReel(id)
+deleteReel(id)
+listCardsForReel(reelId, filters)
+setCardReels(cardId, reelIds)
+addCardToReel(reelId, cardId)
+removeCardFromReel(reelId, cardId)
+reorderReels(reelIds)
+reorderCardsInReel(reelId, cardIds)
+```
+
+Rules:
+
+- Always create a non-deletable default reel during migration/backfill.
+- Deleting a reel does not delete cards or image files.
+- Archiving a card removes it from active reel views but preserves membership rows for restoration.
+- A card can belong to multiple reels.
+- `cards.sort_order` remains a backward-compatible/default ordering field until reel-specific ordering is fully migrated.
+
 ### `CardAssetsRepository`
 
 ```ts
@@ -552,11 +621,13 @@ useCards(filters)
 useCard(cardId)
 useCategories()
 useCardSearch(query)
+useReels()
+useReelCards(reelId, filters)
 useAppSettings()
 useAppLock()
 ```
 
-If later adding sync or remote decks, introduce TanStack Query or a sync-specific cache then.
+If later adding sync or remote decks, introduce TanStack Query or a sync-specific cache then. Local multi-reel support can remain repository/hook-driven without a global normalized store unless drag/drop membership editing becomes complex.
 
 ---
 
@@ -680,6 +751,28 @@ Use `expo-haptics`.
 - Android-specific future: `performAndroidHapticsAsync(AndroidHaptics.Segment_Tick)`
 
 Throttle haptics so fast flicks do not spam feedback.
+
+### Future multiple local reels
+
+Post-MVP, the app should support multiple local badge reels so users can sort cards by role, unit, specialty, shift, or personal workflow.
+
+UX requirements:
+
+- Home shows a reel selector above the reel/search controls.
+- A default reel is created automatically and contains existing cards after migration.
+- Users can create, rename, recolor, reorder, archive, and delete local reels.
+- Users can add/remove cards from reels from the add/edit card flow and from card quick actions.
+- A card may belong to multiple reels without duplicating files.
+- Search/filter can operate within the selected reel, with an optional “All cards” scope.
+- Reordering cards is reel-specific.
+- Deleting a reel never deletes cards; deleting a card removes it from every reel.
+- Archived cards are hidden from active reel views unless the Archived filter is selected.
+
+Implementation notes:
+
+- Keep the visual `BadgeReel` component reusable by passing already-filtered `cards`.
+- Store reel membership/order in `reel_cards`; do not overload category or tags for reel membership.
+- Keep categories/tags orthogonal: categories describe the card, reels describe where the user wants it to appear.
 
 ### Performance rules
 
@@ -1227,6 +1320,30 @@ Acceptance:
 
 - MVP is TestFlight/internal-testing ready
 
+### Milestone 6: Multiple local reels — planned post-MVP
+
+Goal:
+
+- users can organize cards into multiple local reels without duplicating card images or metadata
+
+Deliver:
+
+- database migration for `reels` and `reel_cards`
+- default reel creation and existing-card backfill
+- reel selector on home screen
+- local reel manager route
+- create/rename/recolor/reorder/archive/delete reels
+- add/edit card membership picker
+- quick action to add/remove a card from reels
+- reel-specific card ordering
+- search/filter scoped to selected reel with optional all-cards scope
+
+Acceptance:
+
+- user can create several reels, sort cards into them, switch reels quickly, and view the same card in multiple reels
+- deleting a reel does not delete cards or image files
+- existing users migrate into a default reel without losing order
+
 ---
 
 ## 22. Deferred features
@@ -1235,7 +1352,7 @@ Do not build in MVP unless the app is already stable:
 
 - cloud sync
 - user accounts
-- team/shared decks
+- team/shared/cloud decks
 - built-in clinical content library
 - OCR
 - PDF page splitting
@@ -1257,12 +1374,14 @@ Before implementation, decide:
 4. Whether back side is required or optional. Recommendation: optional.
 5. Whether app lock is prompted on every launch or after timeout. Recommendation: configurable timeout.
 6. Whether to include sample cards. Recommendation: yes, but clearly marked as non-clinical/demo unless medically reviewed.
+7. Whether cards can belong to multiple local reels. Recommendation: yes, use many-to-many `reel_cards` membership.
+8. Whether every card must belong to at least one reel. Recommendation: yes for active cards; archive can hide cards from active reel views without deleting membership.
 
 ---
 
 ## 24. Recommended next implementation task
 
-Prepare for internal testing.
+Prepare for internal testing, then start Milestone 6.
 
 Recommended next build:
 
@@ -1272,6 +1391,14 @@ manual validation / internal test prep
   - validate app lock on device
   - validate add/edit/delete/archive/restore on device
   - decide whether to add an export/backup workflow before broader testing
+
+then:
+src/features/reels/
+  ReelSelector.tsx
+  ReelManagerScreen.tsx
+  ReelMembershipPicker.tsx
+  useReels.ts
+  useReelCards.ts
 ```
 
-Focus on native-device validation for SecureStore, Face ID / biometric prompts, image import, and file cleanup before TestFlight/internal distribution.
+Focus first on native-device validation for SecureStore, Face ID / biometric prompts, image import, and file cleanup before TestFlight/internal distribution. After validation, implement local multi-reel organization as the next product milestone.
