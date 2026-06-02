@@ -31,6 +31,7 @@ type CardRow = {
   primary_file_uri: string | null;
   primary_width: number | null;
   primary_height: number | null;
+  tag_names: string | null;
 };
 
 const DEFAULT_ACCENT = "#2DD4BF";
@@ -74,6 +75,12 @@ function mapCardRowToBadgeCard(row: CardRow): BadgeCard {
       row.primary_display_uri ||
       row.primary_file_uri,
     ),
+    tags: row.tag_names
+      ? row.tag_names
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      : [],
   };
 }
 
@@ -86,7 +93,13 @@ SELECT
   primary_asset.display_uri AS primary_display_uri,
   primary_asset.file_uri AS primary_file_uri,
   primary_asset.width AS primary_width,
-  primary_asset.height AS primary_height
+  primary_asset.height AS primary_height,
+  (
+    SELECT GROUP_CONCAT(tags.name, ',')
+    FROM tags
+    INNER JOIN card_tags ON card_tags.tag_id = tags.id
+    WHERE card_tags.card_id = cards.id
+  ) AS tag_names
 FROM cards
 LEFT JOIN categories ON categories.id = cards.category_id
 LEFT JOIN card_assets AS primary_asset ON primary_asset.id = (
@@ -300,8 +313,15 @@ export async function searchCards(db: AppDatabase, query: string) {
          OR cards.subtitle LIKE ?
          OR cards.notes LIKE ?
          OR categories.name LIKE ?
+         OR EXISTS (
+           SELECT 1
+           FROM tags
+           INNER JOIN card_tags ON card_tags.tag_id = tags.id
+           WHERE card_tags.card_id = cards.id AND tags.name LIKE ?
+         )
        )
      ORDER BY cards.sort_order ASC, cards.created_at ASC`,
+    normalizedQuery,
     normalizedQuery,
     normalizedQuery,
     normalizedQuery,

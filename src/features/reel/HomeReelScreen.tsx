@@ -13,6 +13,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { BadgeCard } from "@/features/cards/types";
 import { useCards } from "@/features/cards/useCards";
+import { SearchFilterBar } from "@/features/search/SearchFilterBar";
+import { SearchResultsList } from "@/features/search/SearchResultsList";
+import {
+  useFilteredCards,
+  type CardFilter,
+} from "@/features/search/useFilteredCards";
 import { useBooleanSetting } from "@/features/settings/useBooleanSetting";
 
 import { BadgeReel } from "./BadgeReel";
@@ -38,6 +44,8 @@ export function HomeReelScreen() {
   const [quickActionCard, setQuickActionCard] = useState<BadgeCard | null>(
     null,
   );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [cardFilter, setCardFilter] = useState<CardFilter>({ type: "all" });
 
   useFocusEffect(
     useCallback(() => {
@@ -49,6 +57,11 @@ export function HomeReelScreen() {
     () => cards.filter((card) => card.isFavorite).length,
     [cards],
   );
+  const { categories, filteredCards, isFiltering, tags } = useFilteredCards({
+    cards,
+    filter: cardFilter,
+    query: searchQuery,
+  });
 
   const handleFavoriteToggle = async (cardToToggle: BadgeCard) => {
     await toggleFavorite(cardToToggle.id);
@@ -123,15 +136,68 @@ export function HomeReelScreen() {
           />
         </View>
 
-        <View style={styles.reelWrapper}>
-          <BadgeReel
-            cards={cards}
-            hapticsEnabled={hapticsEnabled}
-            reduceMotion={reduceMotion}
-            onCardLongPress={setQuickActionCard}
-            onCardPress={handleCardPress}
-            onFavoriteToggle={handleFavoriteToggle}
+        <SearchFilterBar
+          query={searchQuery}
+          filter={cardFilter}
+          categories={categories}
+          tags={tags}
+          resultCount={filteredCards.length}
+          totalCount={cards.length}
+          onQueryChange={setSearchQuery}
+          onFilterChange={setCardFilter}
+        />
+
+        {error ? (
+          <InlineNotice
+            title={isPersisted ? "Database warning" : "Demo fallback active"}
+            text={
+              isPersisted
+                ? error.message
+                : "Native SQLite is unavailable here, so BadgeDeck is showing demo cards. Use a development build for local storage."
+            }
           />
+        ) : null}
+
+        <View style={styles.reelWrapper}>
+          {cards.length === 0 && isLoading ? (
+            <StatePanel
+              title="Loading cards…"
+              text="Opening your local badge card library."
+            />
+          ) : cards.length === 0 ? (
+            <StatePanel
+              title="No cards yet"
+              text="Add your first badge reference card to start building the reel."
+              actionLabel="Add card"
+              onAction={() => router.push("/add")}
+            />
+          ) : filteredCards.length === 0 ? (
+            <StatePanel
+              title="No matching cards"
+              text="Try another search term or clear the active filter."
+              actionLabel="Clear search"
+              onAction={() => {
+                setSearchQuery("");
+                setCardFilter({ type: "all" });
+              }}
+            />
+          ) : isFiltering ? (
+            <SearchResultsList
+              cards={filteredCards}
+              onCardLongPress={setQuickActionCard}
+              onCardPress={handleCardPress}
+              onFavoriteToggle={handleFavoriteToggle}
+            />
+          ) : (
+            <BadgeReel
+              cards={cards}
+              hapticsEnabled={hapticsEnabled}
+              reduceMotion={reduceMotion}
+              onCardLongPress={setQuickActionCard}
+              onCardPress={handleCardPress}
+              onFavoriteToggle={handleFavoriteToggle}
+            />
+          )}
         </View>
 
         <View style={styles.footerPanel}>
@@ -148,6 +214,11 @@ export function HomeReelScreen() {
             </Text>
             {isLoading && (
               <Text style={styles.footerStat}>Loading database…</Text>
+            )}
+            {isFiltering && (
+              <Text style={styles.footerStat}>
+                {filteredCards.length} shown
+              </Text>
             )}
             {error && <Text style={styles.footerStat}>Fallback active</Text>}
           </View>
@@ -210,6 +281,48 @@ function ToggleButton({ label, selected, onPress }: ToggleButtonProps) {
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+type StatePanelProps = {
+  title: string;
+  text: string;
+  actionLabel?: string;
+  onAction?: () => void;
+};
+
+function StatePanel({ title, text, actionLabel, onAction }: StatePanelProps) {
+  return (
+    <View style={styles.statePanel}>
+      <Text style={styles.statePanelTitle}>{title}</Text>
+      <Text style={styles.statePanelText}>{text}</Text>
+      {actionLabel && onAction ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAction}
+          style={({ pressed }) => [
+            styles.statePanelButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.statePanelButtonText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+type InlineNoticeProps = {
+  title: string;
+  text: string;
+};
+
+function InlineNotice({ title, text }: InlineNoticeProps) {
+  return (
+    <View style={styles.inlineNotice}>
+      <Text style={styles.inlineNoticeTitle}>{title}</Text>
+      <Text style={styles.inlineNoticeText}>{text}</Text>
+    </View>
   );
 }
 
@@ -407,6 +520,62 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "stretch",
     marginTop: 2,
+  },
+  inlineNotice: {
+    marginHorizontal: 22,
+    marginTop: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#FBBF2466",
+    backgroundColor: "#FBBF2417",
+    padding: 12,
+    gap: 4,
+  },
+  inlineNoticeTitle: {
+    color: "#FDE68A",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  inlineNoticeText: {
+    color: "#FDE68A",
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "700",
+  },
+  statePanel: {
+    marginHorizontal: 22,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: "#26364F",
+    backgroundColor: "#101C2EE6",
+    padding: 18,
+    alignItems: "center",
+    gap: 9,
+  },
+  statePanelTitle: {
+    color: "#F8FAFC",
+    fontSize: 20,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  statePanelText: {
+    color: "#94A3B8",
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  statePanelButton: {
+    marginTop: 6,
+    borderRadius: 16,
+    backgroundColor: "#2DD4BF",
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+  },
+  statePanelButtonText: {
+    color: "#04111F",
+    fontSize: 13,
+    fontWeight: "900",
   },
   footerPanel: {
     marginHorizontal: 22,

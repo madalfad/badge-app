@@ -14,6 +14,8 @@ The current build includes:
 - First-run privacy notice
 - Settings screen for app lock, lock timeout, haptics, and reduced motion
 - Native app-lock foundation using SecureStore PIN storage and device authentication prompts
+- Local search and filters for favorites, categories, and tags
+- Search result list plus empty/error state messaging
 
 ## Requirements
 

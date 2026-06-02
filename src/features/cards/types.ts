@@ -18,6 +18,7 @@ export type BadgeCard = {
   frontFileUri?: string | null;
   imageAspectRatio?: number | null;
   hasUserImage?: boolean;
+  tags?: string[];
 };
 
 export type CardRecord = {

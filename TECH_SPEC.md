@@ -1210,13 +1210,16 @@ Delivered:
 - configurable background lock timeout
 - haptic setting
 - reduced motion setting
+- local search across loaded card summaries
+- favorites/category/tag filters
+- flat search results list
+- no-cards and no-results empty states
+- visible database/demo-fallback error messaging
 
 Remaining:
 
 - native-device validation for app lock, SecureStore, and Face ID / biometric prompts
-- search/filter
-- empty states
-- error states
+- recently viewed and archived filters
 - app-lock recovery/forgot-PIN guidance
 
 Acceptance:
@@ -1263,9 +1266,11 @@ Continue **Milestone 5: Security and polish**.
 Recommended next build:
 
 ```text
+src/features/security/
+  AppLockRecoveryNotice.tsx
+
 src/features/search/
-  SearchFilterBar.tsx
-  useFilteredCards.ts
+  recent/archive filters
 ```
 
-Focus on search/filter, stronger empty/error states, and native-device validation for the app-lock flow before internal testing.
+Focus on native-device validation for the app-lock flow, app-lock recovery guidance, and recently viewed/archived filters before internal testing.
