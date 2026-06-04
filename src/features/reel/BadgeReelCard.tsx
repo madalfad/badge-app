@@ -57,6 +57,7 @@ function BadgeReelCardComponent({
 
   const imageUri =
     card.frontThumbnailUri ?? card.frontDisplayUri ?? card.frontFileUri;
+  const showImageMeta = height >= 230 && width >= 230;
 
   return (
     <Pressable
@@ -80,7 +81,7 @@ function BadgeReelCardComponent({
         >
           <Image
             source={{ uri: imageUri }}
-            contentFit="cover"
+            contentFit="contain"
             recyclingKey={card.id}
             style={StyleSheet.absoluteFill}
           />
@@ -106,20 +107,22 @@ function BadgeReelCardComponent({
               ★
             </Text>
           </View>
-          <View style={styles.imageBottomPanel}>
-            <Text numberOfLines={2} style={styles.imageTitle}>
-              {card.title}
-            </Text>
-            {card.subtitle ? (
-              <Text numberOfLines={2} style={styles.imageSubtitle}>
-                {card.subtitle}
+          {showImageMeta ? (
+            <View style={styles.imageBottomPanel}>
+              <Text numberOfLines={2} style={styles.imageTitle}>
+                {card.title}
               </Text>
-            ) : (
-              <Text numberOfLines={1} style={styles.imageSubtitle}>
-                Imported reference image
-              </Text>
-            )}
-          </View>
+              {card.subtitle ? (
+                <Text numberOfLines={2} style={styles.imageSubtitle}>
+                  {card.subtitle}
+                </Text>
+              ) : (
+                <Text numberOfLines={1} style={styles.imageSubtitle}>
+                  Imported reference image
+                </Text>
+              )}
+            </View>
+          ) : null}
         </View>
       ) : (
         <View style={[styles.card, focused && styles.focusedCard]}>
@@ -199,7 +202,7 @@ const styles = StyleSheet.create({
     boxShadow: "0 18px 22px rgba(0, 0, 0, 0.22)",
   },
   imageCard: {
-    backgroundColor: "#020817",
+    backgroundColor: "#F8FAFC",
     padding: 0,
     borderColor: "#FFFFFFCC",
   },
@@ -209,7 +212,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: "#02081722",
+    backgroundColor: "#02081708",
   },
   imageTopRow: {
     position: "absolute",

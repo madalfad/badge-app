@@ -82,7 +82,7 @@ function SearchResultItem({
         {imageUri ? (
           <Image
             source={{ uri: imageUri }}
-            contentFit="cover"
+            contentFit="contain"
             recyclingKey={`${card.id}-search`}
             style={StyleSheet.absoluteFill}
           />
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    backgroundColor: "#07111F",
+    backgroundColor: "#F8FAFC",
   },
   codeText: {
     fontSize: 12,

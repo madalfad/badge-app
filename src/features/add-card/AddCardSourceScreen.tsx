@@ -265,24 +265,24 @@ export function AddCardSourceScreen() {
             <Text style={styles.sectionTitle}>Crop preset</Text>
             <View style={styles.segmentRow}>
               <SegmentButton
-                label="Auto-fit"
+                label="Original"
                 selected={cropPreset === "auto"}
                 onPress={() => setCropPreset("auto")}
               />
               <SegmentButton
-                label="Landscape"
+                label="Landscape crop"
                 selected={cropPreset === "landscape"}
                 onPress={() => setCropPreset("landscape")}
               />
               <SegmentButton
-                label="Portrait"
+                label="Portrait crop"
                 selected={cropPreset === "portrait"}
                 onPress={() => setCropPreset("portrait")}
               />
             </View>
             <Text style={styles.helperText}>
-              Presets center-crop the saved display/thumbnail images. Use rotate
-              if the camera captured sideways.
+              Original preserves the imported badge size. Crop presets are only
+              applied when you want a standard card shape.
             </Text>
           </View>
 

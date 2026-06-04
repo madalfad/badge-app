@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   Modal,
   Pressable,
@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
-  BadgeIconButton,
   badgeColors,
   useBadgeLayout,
 } from "@/components/badge-ui";
@@ -31,6 +30,9 @@ import {
 import { useBooleanSetting } from "@/features/settings/useBooleanSetting";
 
 import { BadgeReel } from "./BadgeReel";
+
+type HomePanel = "reels" | "search" | "more" | null;
+
 export function HomeReelScreen() {
   const router = useRouter();
   const layout = useBadgeLayout();
@@ -58,6 +60,7 @@ export function HomeReelScreen() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [cardFilter, setCardFilter] = useState<CardFilter>({ type: "all" });
+  const [activePanel, setActivePanel] = useState<HomePanel>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -98,6 +101,13 @@ export function HomeReelScreen() {
   };
 
   const closeQuickActions = () => setQuickActionCard(null);
+  const openPanel = (panel: Exclude<HomePanel, null>) => {
+    setActivePanel((currentPanel) => (currentPanel === panel ? null : panel));
+  };
+  const returnHome = () => {
+    setActivePanel(null);
+    clearSearch();
+  };
   const selectedReelLabel = reelsState.selectedReelId
     ? (reelsState.reels.find((reel) => reel.id === reelsState.selectedReelId)
         ?.name ?? "Reel")
@@ -145,7 +155,7 @@ export function HomeReelScreen() {
 
   return (
     <View style={styles.screen}>
-      <SafeAreaView edges={["top"]} style={styles.safeArea}>
+      <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
         <View
           style={[
             styles.homeShell,
@@ -162,64 +172,7 @@ export function HomeReelScreen() {
                 {activeCards.length} active / {isPersisted ? "local" : "demo"}
               </Text>
             </View>
-            <View style={styles.appActions}>
-              <BadgeIconButton
-                accessibilityLabel="Open settings"
-                icon="..."
-                onPress={() => router.push("/settings")}
-              />
-              <BadgeIconButton
-                accessibilityLabel="Add card"
-                icon="+"
-                onPress={() => router.push("/add")}
-                variant="primary"
-              />
-            </View>
           </View>
-
-          <View style={styles.controlsRow}>
-            <ToggleButton
-              label="3D"
-              selected={!reduceMotion}
-              onPress={() => setReduceMotion(false)}
-            />
-            <ToggleButton
-              label="Calm"
-              selected={reduceMotion}
-              onPress={() => setReduceMotion(true)}
-            />
-            <ToggleButton
-              label="Haptic"
-              selected={hapticsEnabled}
-              onPress={() => setHapticsEnabled((enabled) => !enabled)}
-            />
-          </View>
-
-          <ReelSelector
-            reels={reelsState.reels}
-            selectedReelId={reelsState.selectedReelId}
-            allActiveCardCount={reelsState.allActiveCardCount}
-            isLoading={reelsState.isLoading}
-            onSelectReel={(reelId) => {
-              reelsState.selectReel(reelId).catch(() => undefined);
-            }}
-            onCreateReel={reelsState.createNewReel}
-            onUpdateReel={reelsState.updateExistingReel}
-            onArchiveReel={reelsState.archiveExistingReel}
-            onDeleteReel={reelsState.deleteExistingReel}
-            onMoveReel={reelsState.moveReel}
-          />
-
-          <SearchFilterBar
-            query={searchQuery}
-            filter={cardFilter}
-            categories={categories}
-            tags={tags}
-            resultCount={filteredCards.length}
-            totalCount={cards.length}
-            onQueryChange={setSearchQuery}
-            onFilterChange={setCardFilter}
-          />
 
           {error ? (
             <InlineNotice
@@ -254,8 +207,88 @@ export function HomeReelScreen() {
               onViewArchived={() => setCardFilter({ type: "archived" })}
             />
           </View>
+
+          <HomeBottomNav
+            activePanel={activePanel}
+            isFiltering={isFiltering}
+            onAdd={() => router.push("/add")}
+            onHome={returnHome}
+            onMore={() => openPanel("more")}
+            onReels={() => openPanel("reels")}
+            onSearch={() => openPanel("search")}
+          />
         </View>
       </SafeAreaView>
+
+      <HomePanelModal
+        panel={activePanel}
+        onClose={() => setActivePanel(null)}
+      >
+        {activePanel === "reels" ? (
+          <>
+            <View style={styles.sheetControls}>
+              <Text style={styles.sheetSectionTitle}>Display</Text>
+              <View style={styles.sheetControlsRow}>
+                <ToggleButton
+                  label="3D"
+                  selected={!reduceMotion}
+                  onPress={() => setReduceMotion(false)}
+                />
+                <ToggleButton
+                  label="Calm"
+                  selected={reduceMotion}
+                  onPress={() => setReduceMotion(true)}
+                />
+                <ToggleButton
+                  label="Haptic"
+                  selected={hapticsEnabled}
+                  onPress={() => setHapticsEnabled((enabled) => !enabled)}
+                />
+              </View>
+            </View>
+            <ReelSelector
+              reels={reelsState.reels}
+              selectedReelId={reelsState.selectedReelId}
+              allActiveCardCount={reelsState.allActiveCardCount}
+              isLoading={reelsState.isLoading}
+              onSelectReel={(reelId) => {
+                reelsState.selectReel(reelId).catch(() => undefined);
+              }}
+              onCreateReel={reelsState.createNewReel}
+              onUpdateReel={reelsState.updateExistingReel}
+              onArchiveReel={reelsState.archiveExistingReel}
+              onDeleteReel={reelsState.deleteExistingReel}
+              onMoveReel={reelsState.moveReel}
+            />
+          </>
+        ) : null}
+
+        {activePanel === "search" ? (
+          <SearchFilterBar
+            query={searchQuery}
+            filter={cardFilter}
+            categories={categories}
+            tags={tags}
+            resultCount={filteredCards.length}
+            totalCount={cards.length}
+            onQueryChange={setSearchQuery}
+            onFilterChange={setCardFilter}
+          />
+        ) : null}
+
+        {activePanel === "more" ? (
+          <View style={styles.morePanel}>
+            <ActionButton
+              label="Settings"
+              onPress={() => {
+                setActivePanel(null);
+                router.push("/settings");
+              }}
+            />
+            <ActionButton label="Clear filters" onPress={returnHome} />
+          </View>
+        ) : null}
+      </HomePanelModal>
 
       <QuickActionsModal
         card={quickActionCard}
@@ -269,6 +302,129 @@ export function HomeReelScreen() {
         }}
       />
     </View>
+  );
+}
+
+type HomeBottomNavProps = {
+  activePanel: HomePanel;
+  isFiltering: boolean;
+  onAdd: () => void;
+  onHome: () => void;
+  onMore: () => void;
+  onReels: () => void;
+  onSearch: () => void;
+};
+
+function HomeBottomNav({
+  activePanel,
+  isFiltering,
+  onAdd,
+  onHome,
+  onMore,
+  onReels,
+  onSearch,
+}: HomeBottomNavProps) {
+  return (
+    <View style={styles.bottomNav}>
+      <NavButton
+        label="Reels"
+        selected={activePanel === "reels"}
+        onPress={onReels}
+      />
+      <NavButton
+        label="Search"
+        selected={activePanel === "search" || (!activePanel && isFiltering)}
+        onPress={onSearch}
+      />
+      <NavButton home label="Home" selected={!activePanel && !isFiltering} onPress={onHome} />
+      <NavButton label="Add" onPress={onAdd} />
+      <NavButton label="More" selected={activePanel === "more"} onPress={onMore} />
+    </View>
+  );
+}
+
+type NavButtonProps = {
+  label: string;
+  home?: boolean;
+  selected?: boolean;
+  onPress: () => void;
+};
+
+function NavButton({ home, label, selected, onPress }: NavButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.navButton,
+        home && styles.homeNavButton,
+        selected && !home && styles.navButtonSelected,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.navButtonText,
+          home && styles.homeNavButtonText,
+          selected && styles.navButtonTextSelected,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+type HomePanelModalProps = {
+  panel: HomePanel;
+  children: ReactNode;
+  onClose: () => void;
+};
+
+function HomePanelModal({ children, onClose, panel }: HomePanelModalProps) {
+  const layout = useBadgeLayout();
+  const title =
+    panel === "reels" ? "Reels" : panel === "search" ? "Search" : "More";
+
+  return (
+    <Modal
+      animationType="slide"
+      transparent
+      visible={Boolean(panel)}
+      onRequestClose={onClose}
+    >
+      <View style={styles.panelBackdrop}>
+        <Pressable
+          accessibilityRole="button"
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+        />
+        <View
+          style={[
+            styles.panelSheet,
+            layout.contentMaxWidth ? { maxWidth: layout.contentMaxWidth } : null,
+          ]}
+        >
+          <View style={styles.panelHandle} />
+          <View style={styles.panelHeader}>
+            <Text style={styles.panelTitle}>{title}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onClose}
+              style={({ pressed }) => [
+                styles.panelCloseButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.panelCloseText}>Done</Text>
+            </Pressable>
+          </View>
+          {children}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -529,7 +685,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
     alignSelf: "center",
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   appBar: {
     minHeight: 58,
@@ -562,17 +718,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 1,
   },
-  appActions: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  controlsRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    flexWrap: "wrap",
-  },
   toggleButton: {
     borderRadius: 999,
     paddingHorizontal: 13,
@@ -597,11 +742,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "stretch",
-    minHeight: 360,
+    minHeight: 0,
     paddingTop: 4,
   },
   compactReelWrapper: {
-    minHeight: 300,
+    minHeight: 0,
   },
   inlineNotice: {
     marginHorizontal: 16,
@@ -658,6 +803,124 @@ const styles = StyleSheet.create({
     color: "#04111F",
     fontSize: 13,
     fontWeight: "900",
+  },
+  bottomNav: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 7,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#26364F",
+    backgroundColor: "#101C2EF2",
+    padding: 8,
+    marginHorizontal: 12,
+    marginTop: 8,
+  },
+  navButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  homeNavButton: {
+    flex: 1.18,
+    minHeight: 56,
+    borderRadius: 24,
+    backgroundColor: "#2DD4BF",
+  },
+  navButtonSelected: {
+    backgroundColor: "#2DD4BF22",
+  },
+  navButtonText: {
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  homeNavButtonText: {
+    color: "#04111F",
+    fontSize: 13,
+  },
+  navButtonTextSelected: {
+    color: "#F8FAFC",
+  },
+  panelBackdrop: {
+    flex: 1,
+    backgroundColor: "#0208178F",
+    justifyContent: "flex-end",
+  },
+  panelSheet: {
+    width: "100%",
+    alignSelf: "center",
+    maxHeight: "76%",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: "#26364F",
+    backgroundColor: "#07111F",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 18,
+    gap: 12,
+  },
+  panelHandle: {
+    alignSelf: "center",
+    width: 58,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#3A4D6B",
+  },
+  panelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 4,
+  },
+  panelTitle: {
+    color: "#F8FAFC",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  panelCloseButton: {
+    borderRadius: 999,
+    backgroundColor: "#17243A",
+    borderWidth: 1,
+    borderColor: "#26364F",
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  panelCloseText: {
+    color: "#CBD5E1",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  sheetControls: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#26364F",
+    backgroundColor: "#101C2E",
+    padding: 12,
+    gap: 10,
+    marginHorizontal: 16,
+  },
+  sheetSectionTitle: {
+    color: "#F8FAFC",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  sheetControlsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  morePanel: {
+    paddingHorizontal: 16,
+    gap: 10,
   },
   pressed: {
     opacity: 0.78,

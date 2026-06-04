@@ -54,6 +54,37 @@ type AnimatedReelItemProps = {
   onLongPress: () => void;
 };
 
+type CardRenderSize = {
+  width: number;
+  height: number;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getCardRenderSize(
+  card: BadgeCard,
+  maxWidth: number,
+  maxHeight: number,
+): CardRenderSize {
+  const defaultAspectRatio = 1 / 1.45;
+  const rawAspectRatio =
+    card.hasUserImage && card.imageAspectRatio
+      ? card.imageAspectRatio
+      : defaultAspectRatio;
+  const aspectRatio = clamp(rawAspectRatio, 0.28, 3.75);
+  let width = maxWidth;
+  let height = width / aspectRatio;
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height * aspectRatio;
+  }
+
+  return { width, height };
+}
+
 function triggerSelectionHaptic() {
   Haptics.selectionAsync().catch(() => undefined);
 }
@@ -173,16 +204,16 @@ export function BadgeReel({
 
   const dimensions = useMemo(() => {
     const stageWidth = Math.min(width, 430);
-    const cardWidth = Math.min(stageWidth - 54, 350);
-    const cardHeight = Math.min(cardWidth * 1.45, height * 0.57);
+    const maxCardWidth = Math.min(stageWidth - 54, 350);
+    const maxCardHeight = Math.min(maxCardWidth * 1.45, height * 0.54);
     const stageHeight = Math.min(
-      Math.max(cardHeight + 190, 520),
-      height * 0.74,
+      Math.max(maxCardHeight + 150, 430),
+      height * 0.66,
     );
     return {
-      cardWidth,
-      cardHeight,
-      itemSpacing: cardHeight * 0.39,
+      maxCardWidth,
+      maxCardHeight,
+      itemSpacing: maxCardHeight * 0.39,
       stageWidth,
       stageHeight,
     };
@@ -276,12 +307,11 @@ export function BadgeReel({
         showsVerticalScrollIndicator={false}
       >
         {cards.map((card) => (
-          <BadgeReelCard
+          <ReducedMotionCard
             key={card.id}
             card={card}
-            focused
-            height={dimensions.cardHeight * 0.86}
-            width={dimensions.cardWidth}
+            maxHeight={dimensions.maxCardHeight * 0.9}
+            maxWidth={dimensions.maxCardWidth}
             onDoublePress={() => onFavoriteToggle(card)}
             onLongPress={() => handleLongPress(card)}
             onPress={() => onCardPress(card)}
@@ -303,12 +333,17 @@ export function BadgeReel({
         <View style={styles.gestureSurface}>
           {visibleCards.map(({ card, index }) => {
             const focused = activeIndex === index;
+            const cardSize = getCardRenderSize(
+              card,
+              dimensions.maxCardWidth,
+              dimensions.maxCardHeight,
+            );
             return (
               <AnimatedReelItem
                 key={card.id}
                 card={card}
-                cardHeight={dimensions.cardHeight}
-                cardWidth={dimensions.cardWidth}
+                cardHeight={cardSize.height}
+                cardWidth={cardSize.width}
                 focused={focused}
                 index={index}
                 itemSpacing={dimensions.itemSpacing}
@@ -330,6 +365,38 @@ export function BadgeReel({
         </View>
       </GestureDetector>
     </View>
+  );
+}
+
+type ReducedMotionCardProps = {
+  card: BadgeCard;
+  maxWidth: number;
+  maxHeight: number;
+  onPress: () => void;
+  onDoublePress: () => void;
+  onLongPress: () => void;
+};
+
+function ReducedMotionCard({
+  card,
+  maxHeight,
+  maxWidth,
+  onDoublePress,
+  onLongPress,
+  onPress,
+}: ReducedMotionCardProps) {
+  const cardSize = getCardRenderSize(card, maxWidth, maxHeight);
+
+  return (
+    <BadgeReelCard
+      card={card}
+      focused
+      height={cardSize.height}
+      width={cardSize.width}
+      onDoublePress={onDoublePress}
+      onLongPress={onLongPress}
+      onPress={onPress}
+    />
   );
 }
 
