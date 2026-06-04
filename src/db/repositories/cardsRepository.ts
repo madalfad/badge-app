@@ -86,7 +86,8 @@ function mapCardRowToBadgeCard(row: CardRow): BadgeCard {
   };
 }
 
-const CARD_SELECT = `
+function createCardSelect(cardJoin = "") {
+  return `
 SELECT
   cards.*,
   categories.name AS category_name,
@@ -103,6 +104,7 @@ SELECT
     WHERE card_tags.card_id = cards.id
   ) AS tag_names
 FROM cards
+${cardJoin}
 LEFT JOIN categories ON categories.id = cards.category_id
 LEFT JOIN card_assets AS primary_asset ON primary_asset.id = (
   SELECT id
@@ -112,94 +114,49 @@ LEFT JOIN card_assets AS primary_asset ON primary_asset.id = (
   LIMIT 1
 )
 `;
+}
 
 type ListCardsOptions = {
   includeArchived?: boolean;
+  reelId?: string | null;
 };
 
 export async function listCards(
   db: AppDatabase,
   options: ListCardsOptions = {},
 ) {
+  const params: unknown[] = [];
+  const cardJoin = options.reelId
+    ? "INNER JOIN reel_cards ON reel_cards.card_id = cards.id AND reel_cards.reel_id = ?"
+    : "";
+  if (options.reelId) {
+    params.push(options.reelId);
+  }
+
+  const orderBy = options.reelId
+    ? "cards.is_archived ASC, reel_cards.sort_order ASC, reel_cards.added_at ASC, cards.created_at ASC"
+    : "cards.is_archived ASC, cards.sort_order ASC, cards.created_at ASC";
+
   const rows = await db.getAllAsync<CardRow>(
-    `${CARD_SELECT}
+    `${createCardSelect(cardJoin)}
      ${options.includeArchived ? "" : "WHERE cards.is_archived = 0"}
-     ORDER BY cards.is_archived ASC, cards.sort_order ASC, cards.created_at ASC`,
+     ORDER BY ${orderBy}`,
+    ...params,
   );
   return rows.map(mapCardRowToBadgeCard);
 }
 
 export async function getCardById(db: AppDatabase, id: string) {
   const row = await db.getFirstAsync<CardRow>(
-    `${CARD_SELECT} WHERE cards.id = ?`,
+    `${createCardSelect()} WHERE cards.id = ?`,
     id,
   );
   return row ? mapCardRowToBadgeCard(row) : null;
 }
 
-export async function createCard(db: AppDatabase, input: CreateCardInput) {
-  const id = input.id ?? createId("card");
-  const now = nowIso();
+type InsertableCardInput = CreateCardInput & { id: string };
 
-  await db.runAsync(
-    `INSERT INTO cards (
-       id,
-       title,
-       subtitle,
-       category_id,
-       primary_color,
-       sort_order,
-       is_favorite,
-       is_archived,
-       review_date,
-       source_type,
-       notes,
-       created_at,
-       updated_at,
-       last_viewed_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    id,
-    input.title,
-    input.subtitle ?? null,
-    input.categoryId ?? null,
-    input.primaryColor ?? null,
-    input.sortOrder ?? 0,
-    input.isFavorite ? 1 : 0,
-    input.isArchived ? 1 : 0,
-    input.reviewDate ?? null,
-    input.sourceType ?? "user_image",
-    input.notes ?? null,
-    now,
-    now,
-    null,
-  );
-
-  return id;
-}
-
-export async function upsertCard(
-  db: AppDatabase,
-  input: CreateCardInput & { id: string },
-) {
-  const now = nowIso();
-
-  await db.runAsync(
-    `INSERT INTO cards (
-       id,
-       title,
-       subtitle,
-       category_id,
-       primary_color,
-       sort_order,
-       is_favorite,
-       is_archived,
-       review_date,
-       source_type,
-       notes,
-       created_at,
-       updated_at,
-       last_viewed_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+const UPSERT_CARD_CONFLICT_CLAUSE = `
      ON CONFLICT(id) DO UPDATE SET
        title = excluded.title,
        subtitle = excluded.subtitle,
@@ -211,7 +168,32 @@ export async function upsertCard(
        review_date = excluded.review_date,
        source_type = excluded.source_type,
        notes = excluded.notes,
-       updated_at = excluded.updated_at`,
+       updated_at = excluded.updated_at`;
+
+async function insertCard(
+  db: AppDatabase,
+  input: InsertableCardInput,
+  conflictClause = "",
+) {
+  const now = nowIso();
+
+  await db.runAsync(
+    `INSERT INTO cards (
+       id,
+       title,
+       subtitle,
+       category_id,
+       primary_color,
+       sort_order,
+       is_favorite,
+       is_archived,
+       review_date,
+       source_type,
+       notes,
+       created_at,
+       updated_at,
+       last_viewed_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)${conflictClause}`,
     input.id,
     input.title,
     input.subtitle ?? null,
@@ -231,6 +213,14 @@ export async function upsertCard(
   return input.id;
 }
 
+export async function createCard(db: AppDatabase, input: CreateCardInput) {
+  return insertCard(db, { ...input, id: input.id ?? createId("card") });
+}
+
+export async function upsertCard(db: AppDatabase, input: InsertableCardInput) {
+  return insertCard(db, input, UPSERT_CARD_CONFLICT_CLAUSE);
+}
+
 export async function updateCard(
   db: AppDatabase,
   id: string,
@@ -244,18 +234,26 @@ export async function updateCard(
     params.push(value);
   };
 
-  if ("title" in patch) addUpdate("title", patch.title);
-  if ("subtitle" in patch) addUpdate("subtitle", patch.subtitle ?? null);
-  if ("categoryId" in patch) addUpdate("category_id", patch.categoryId ?? null);
-  if ("primaryColor" in patch)
-    addUpdate("primary_color", patch.primaryColor ?? null);
-  if ("sortOrder" in patch) addUpdate("sort_order", patch.sortOrder ?? 0);
-  if ("isFavorite" in patch) addUpdate("is_favorite", patch.isFavorite ? 1 : 0);
-  if ("isArchived" in patch) addUpdate("is_archived", patch.isArchived ? 1 : 0);
-  if ("reviewDate" in patch) addUpdate("review_date", patch.reviewDate ?? null);
-  if ("sourceType" in patch)
-    addUpdate("source_type", patch.sourceType ?? "user_image");
-  if ("notes" in patch) addUpdate("notes", patch.notes ?? null);
+  const addPatchUpdate = (
+    key: keyof UpdateCardInput,
+    column: string,
+    value: unknown,
+  ) => {
+    if (key in patch) {
+      addUpdate(column, value);
+    }
+  };
+
+  addPatchUpdate("title", "title", patch.title);
+  addPatchUpdate("subtitle", "subtitle", patch.subtitle ?? null);
+  addPatchUpdate("categoryId", "category_id", patch.categoryId ?? null);
+  addPatchUpdate("primaryColor", "primary_color", patch.primaryColor ?? null);
+  addPatchUpdate("sortOrder", "sort_order", patch.sortOrder ?? 0);
+  addPatchUpdate("isFavorite", "is_favorite", patch.isFavorite ? 1 : 0);
+  addPatchUpdate("isArchived", "is_archived", patch.isArchived ? 1 : 0);
+  addPatchUpdate("reviewDate", "review_date", patch.reviewDate ?? null);
+  addPatchUpdate("sourceType", "source_type", patch.sourceType ?? "user_image");
+  addPatchUpdate("notes", "notes", patch.notes ?? null);
 
   if (updates.length === 0) {
     return;
@@ -289,53 +287,10 @@ export async function toggleFavorite(db: AppDatabase, id: string) {
   );
 }
 
-export async function reorderCards(db: AppDatabase, cardIds: string[]) {
-  for (const [sortOrder, cardId] of cardIds.entries()) {
-    await db.runAsync(
-      "UPDATE cards SET sort_order = ?, updated_at = ? WHERE id = ?",
-      sortOrder,
-      nowIso(),
-      cardId,
-    );
-  }
-}
-
 export async function markViewed(db: AppDatabase, id: string) {
   await db.runAsync(
     "UPDATE cards SET last_viewed_at = ? WHERE id = ?",
     nowIso(),
     id,
   );
-}
-
-export async function searchCards(db: AppDatabase, query: string) {
-  const normalizedQuery = `%${query.trim()}%`;
-  if (query.trim().length === 0) {
-    return listCards(db);
-  }
-
-  const rows = await db.getAllAsync<CardRow>(
-    `${CARD_SELECT}
-     WHERE cards.is_archived = 0
-       AND (
-         cards.title LIKE ?
-         OR cards.subtitle LIKE ?
-         OR cards.notes LIKE ?
-         OR categories.name LIKE ?
-         OR EXISTS (
-           SELECT 1
-           FROM tags
-           INNER JOIN card_tags ON card_tags.tag_id = tags.id
-           WHERE card_tags.card_id = cards.id AND tags.name LIKE ?
-         )
-       )
-     ORDER BY cards.sort_order ASC, cards.created_at ASC`,
-    normalizedQuery,
-    normalizedQuery,
-    normalizedQuery,
-    normalizedQuery,
-    normalizedQuery,
-  );
-
-  return rows.map(mapCardRowToBadgeCard);
 }

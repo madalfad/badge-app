@@ -2,7 +2,6 @@ import * as Haptics from "expo-haptics";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -12,12 +11,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useBadgeLayout } from "@/components/badge-ui";
 import { useDatabaseContext } from "@/db/DatabaseProvider";
+import {
+  CardLoadingState,
+  CardUnavailableState,
+} from "@/features/cards/CardRouteStates";
 import {
   archiveCardRecord,
   restoreCardRecord,
   toggleCardFavorite,
 } from "@/features/cards/cardService";
+import type { BadgeCard, CardAssetRecord } from "@/features/cards/types";
 import { useCard } from "@/features/cards/useCard";
 import { BadgeReelCard } from "@/features/reel/BadgeReelCard";
 
@@ -124,187 +129,341 @@ export function CardViewerScreen() {
     }
   }, [cardId, db, reload]);
 
+  const editCard = useCallback(() => {
+    if (!cardId) {
+      return;
+    }
+
+    router.push({
+      pathname: "/card/[id]/edit",
+      params: { id: cardId },
+    });
+  }, [cardId, router]);
+
   if (isLoading) {
-    return (
-      <View style={styles.centeredState}>
-        <ActivityIndicator color="#2DD4BF" />
-        <Text style={styles.centeredStateText}>Opening card…</Text>
-      </View>
-    );
+    return <CardLoadingState message="Opening card…" />;
   }
 
   if (!card || error) {
     return (
-      <SafeAreaView style={styles.centeredState}>
-        <Text style={styles.errorTitle}>Card unavailable</Text>
-        <Text style={styles.errorText}>
-          {error?.message ?? "This card could not be loaded."}
-        </Text>
-        <Pressable
-          style={styles.primaryButton}
-          onPress={() => router.replace("/")}
-        >
-          <Text style={styles.primaryButtonText}>Back to reel</Text>
-        </Pressable>
-      </SafeAreaView>
+      <CardUnavailableState
+        message={error?.message ?? "This card could not be loaded."}
+        onBackToReel={() => router.replace("/")}
+      />
     );
   }
 
   return (
     <View style={[styles.screen, highContrast && styles.highContrastScreen]}>
-      {activeImageUri ? (
-        <ZoomableImage
-          uri={activeImageUri}
-          placeholderUri={placeholderUri}
-          highContrast={highContrast}
-          imageWidth={activeAsset?.width}
-          imageHeight={activeAsset?.height}
-          onSingleTap={() => setControlsVisible((visible) => !visible)}
-        />
-      ) : (
-        <Pressable
-          style={styles.demoCardViewer}
-          onPress={() => setControlsVisible((visible) => !visible)}
-        >
-          <BadgeReelCard
-            card={card}
-            focused
-            width={320}
-            height={460}
-            onPress={() => setControlsVisible((visible) => !visible)}
-            onDoublePress={toggleFavorite}
-            onLongPress={toggleFavorite}
-          />
-        </Pressable>
-      )}
+      <CardViewerStage
+        activeAsset={activeAsset}
+        activeImageUri={activeImageUri}
+        card={card}
+        highContrast={highContrast}
+        placeholderUri={placeholderUri}
+        onToggleControls={() => setControlsVisible((visible) => !visible)}
+        onToggleFavorite={toggleFavorite}
+      />
 
       {controlsVisible ? (
-        <SafeAreaView pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-          <View style={styles.topControls}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.back()}
-              style={styles.roundButton}
-            >
-              <Text style={styles.roundButtonText}>‹</Text>
-            </Pressable>
-            <View style={styles.titleBlock}>
-              <Text numberOfLines={1} style={styles.viewerTitle}>
-                {card.title}
-              </Text>
-              <Text numberOfLines={1} style={styles.viewerSubtitle}>
-                {card.category}
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              disabled={isMutating}
-              onPress={toggleFavorite}
-              style={[
-                styles.roundButton,
-                card.isFavorite && { borderColor: card.accentColor },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.starText,
-                  card.isFavorite && { color: card.accentColor },
-                ]}
-              >
-                ★
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.bottomSheet}>
-            {availableSides.length > 1 ? (
-              <View style={styles.sideToggleRow}>
-                {availableSides.map((asset) => (
-                  <Pressable
-                    key={asset.id}
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      selected: activeAsset?.id === asset.id,
-                    }}
-                    onPress={() => setActiveSide(asset.side)}
-                    style={[
-                      styles.sideToggle,
-                      activeAsset?.id === asset.id && styles.sideToggleSelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.sideToggleText,
-                        activeAsset?.id === asset.id &&
-                          styles.sideToggleTextSelected,
-                      ]}
-                    >
-                      {asset.side === "front" ? "Front" : "Back"}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-
-            <View style={styles.metadataRow}>
-              <InfoPill
-                label={
-                  activeImageUri
-                    ? "Pinch / pan / double tap"
-                    : "Seeded demo card"
-                }
-              />
-              {highContrast ? <InfoPill label="High contrast" /> : null}
-              {card.isArchived ? <InfoPill label="Archived" /> : null}
-              {tags.map((tag) => (
-                <InfoPill key={tag} label={`#${tag}`} />
-              ))}
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.actionRow}
-            >
-              <ViewerAction
-                label={highContrast ? "Normal background" : "High contrast"}
-                onPress={() => setHighContrast((value) => !value)}
-              />
-              <ViewerAction
-                label={card.isFavorite ? "Unfavorite" : "Favorite"}
-                onPress={toggleFavorite}
-                disabled={isMutating}
-              />
-              <ViewerAction
-                label="Edit card"
-                onPress={() => {
-                  if (cardId) {
-                    router.push({
-                      pathname: "/card/[id]/edit",
-                      params: { id: cardId },
-                    });
-                  }
-                }}
-              />
-              {card.isArchived ? (
-                <ViewerAction
-                  label="Restore"
-                  onPress={restoreCard}
-                  disabled={isMutating}
-                />
-              ) : (
-                <ViewerAction
-                  label="Archive"
-                  onPress={archiveCard}
-                  disabled={isMutating}
-                  danger
-                />
-              )}
-            </ScrollView>
-          </View>
-        </SafeAreaView>
+        <ViewerControls
+          activeAsset={activeAsset}
+          activeImageUri={activeImageUri}
+          availableSides={availableSides}
+          card={card}
+          highContrast={highContrast}
+          isMutating={isMutating}
+          tags={tags}
+          onArchive={archiveCard}
+          onBack={() => router.back()}
+          onEdit={editCard}
+          onRestore={restoreCard}
+          onSelectSide={setActiveSide}
+          onToggleFavorite={toggleFavorite}
+          onToggleHighContrast={() => setHighContrast((value) => !value)}
+        />
       ) : null}
     </View>
+  );
+}
+
+type CardViewerStageProps = {
+  activeAsset: CardAssetRecord | null;
+  activeImageUri: string | null;
+  card: BadgeCard;
+  highContrast: boolean;
+  placeholderUri: string | null;
+  onToggleControls: () => void;
+  onToggleFavorite: () => void;
+};
+
+function CardViewerStage({
+  activeAsset,
+  activeImageUri,
+  card,
+  highContrast,
+  placeholderUri,
+  onToggleControls,
+  onToggleFavorite,
+}: CardViewerStageProps) {
+  const layout = useBadgeLayout();
+  const fallbackWidth = Math.min(layout.width - 54, 320);
+  const fallbackHeight = Math.min(fallbackWidth * 1.44, layout.height * 0.64);
+
+  if (activeImageUri) {
+    return (
+      <ZoomableImage
+        uri={activeImageUri}
+        placeholderUri={placeholderUri}
+        highContrast={highContrast}
+        imageWidth={activeAsset?.width}
+        imageHeight={activeAsset?.height}
+        onSingleTap={onToggleControls}
+      />
+    );
+  }
+
+  return (
+    <Pressable style={styles.demoCardViewer} onPress={onToggleControls}>
+      <BadgeReelCard
+        card={card}
+        focused
+        width={fallbackWidth}
+        height={fallbackHeight}
+        onPress={onToggleControls}
+        onDoublePress={onToggleFavorite}
+        onLongPress={onToggleFavorite}
+      />
+    </Pressable>
+  );
+}
+
+type ViewerControlsProps = {
+  activeAsset: CardAssetRecord | null;
+  activeImageUri: string | null;
+  availableSides: CardAssetRecord[];
+  card: BadgeCard;
+  highContrast: boolean;
+  isMutating: boolean;
+  tags: string[];
+  onArchive: () => void;
+  onBack: () => void;
+  onEdit: () => void;
+  onRestore: () => void;
+  onSelectSide: (side: string) => void;
+  onToggleFavorite: () => void;
+  onToggleHighContrast: () => void;
+};
+
+function ViewerControls({
+  activeAsset,
+  activeImageUri,
+  availableSides,
+  card,
+  highContrast,
+  isMutating,
+  tags,
+  onArchive,
+  onBack,
+  onEdit,
+  onRestore,
+  onSelectSide,
+  onToggleFavorite,
+  onToggleHighContrast,
+}: ViewerControlsProps) {
+  const layout = useBadgeLayout();
+
+  return (
+    <SafeAreaView pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      <View
+        style={[
+          styles.topControls,
+          { maxWidth: layout.contentMaxWidth, width: "100%" },
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={onBack}
+          style={styles.roundButton}
+        >
+          <Text style={styles.roundButtonText}>‹</Text>
+        </Pressable>
+        <View style={styles.titleBlock}>
+          <Text numberOfLines={1} style={styles.viewerTitle}>
+            {card.title}
+          </Text>
+          <Text numberOfLines={1} style={styles.viewerSubtitle}>
+            {card.category}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={isMutating}
+          onPress={onToggleFavorite}
+          style={[
+            styles.roundButton,
+            card.isFavorite && { borderColor: card.accentColor },
+          ]}
+        >
+          <Text
+            style={[
+              styles.starText,
+              card.isFavorite && { color: card.accentColor },
+            ]}
+          >
+            ★
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.bottomSheet}>
+        <SideToggleRow
+          activeAsset={activeAsset}
+          availableSides={availableSides}
+          onSelectSide={onSelectSide}
+        />
+        <MetadataPills
+          activeImageUri={activeImageUri}
+          card={card}
+          highContrast={highContrast}
+          tags={tags}
+        />
+        <ViewerActionRow
+          card={card}
+          highContrast={highContrast}
+          isMutating={isMutating}
+          onArchive={onArchive}
+          onEdit={onEdit}
+          onRestore={onRestore}
+          onToggleFavorite={onToggleFavorite}
+          onToggleHighContrast={onToggleHighContrast}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+type SideToggleRowProps = {
+  activeAsset: CardAssetRecord | null;
+  availableSides: CardAssetRecord[];
+  onSelectSide: (side: string) => void;
+};
+
+function SideToggleRow({
+  activeAsset,
+  availableSides,
+  onSelectSide,
+}: SideToggleRowProps) {
+  if (availableSides.length <= 1) {
+    return null;
+  }
+
+  return (
+    <View style={styles.sideToggleRow}>
+      {availableSides.map((asset) => (
+        <Pressable
+          key={asset.id}
+          accessibilityRole="button"
+          accessibilityState={{ selected: activeAsset?.id === asset.id }}
+          onPress={() => onSelectSide(asset.side)}
+          style={[
+            styles.sideToggle,
+            activeAsset?.id === asset.id && styles.sideToggleSelected,
+          ]}
+        >
+          <Text
+            style={[
+              styles.sideToggleText,
+              activeAsset?.id === asset.id && styles.sideToggleTextSelected,
+            ]}
+          >
+            {asset.side === "front" ? "Front" : "Back"}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+type MetadataPillsProps = {
+  activeImageUri: string | null;
+  card: BadgeCard;
+  highContrast: boolean;
+  tags: string[];
+};
+
+function MetadataPills({
+  activeImageUri,
+  card,
+  highContrast,
+  tags,
+}: MetadataPillsProps) {
+  return (
+    <View style={styles.metadataRow}>
+      <InfoPill
+        label={activeImageUri ? "Pinch / pan / double tap" : "Seeded demo card"}
+      />
+      {highContrast ? <InfoPill label="High contrast" /> : null}
+      {card.isArchived ? <InfoPill label="Archived" /> : null}
+      {tags.map((tag) => (
+        <InfoPill key={tag} label={`#${tag}`} />
+      ))}
+    </View>
+  );
+}
+
+type ViewerActionRowProps = {
+  card: BadgeCard;
+  highContrast: boolean;
+  isMutating: boolean;
+  onArchive: () => void;
+  onEdit: () => void;
+  onRestore: () => void;
+  onToggleFavorite: () => void;
+  onToggleHighContrast: () => void;
+};
+
+function ViewerActionRow({
+  card,
+  highContrast,
+  isMutating,
+  onArchive,
+  onEdit,
+  onRestore,
+  onToggleFavorite,
+  onToggleHighContrast,
+}: ViewerActionRowProps) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.actionRow}
+    >
+      <ViewerAction
+        label={highContrast ? "Normal background" : "High contrast"}
+        onPress={onToggleHighContrast}
+      />
+      <ViewerAction
+        label={card.isFavorite ? "Unfavorite" : "Favorite"}
+        onPress={onToggleFavorite}
+        disabled={isMutating}
+      />
+      <ViewerAction label="Edit card" onPress={onEdit} />
+      {card.isArchived ? (
+        <ViewerAction
+          label="Restore"
+          onPress={onRestore}
+          disabled={isMutating}
+        />
+      ) : (
+        <ViewerAction
+          label="Archive"
+          onPress={onArchive}
+          disabled={isMutating}
+          danger
+        />
+      )}
+    </ScrollView>
   );
 }
 
@@ -360,44 +519,7 @@ const styles = StyleSheet.create({
   highContrastScreen: {
     backgroundColor: "#000000",
   },
-  centeredState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#07111F",
-    padding: 24,
-  },
-  centeredStateText: {
-    color: "#CBD5E1",
-    fontSize: 14,
-    fontWeight: "800",
-    marginTop: 12,
-  },
-  errorTitle: {
-    color: "#F8FAFC",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  errorText: {
-    color: "#94A3B8",
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "700",
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 18,
-  },
-  primaryButton: {
-    borderRadius: 16,
-    backgroundColor: "#2DD4BF",
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-  },
-  primaryButtonText: {
-    color: "#04111F",
-    fontSize: 14,
-    fontWeight: "900",
-  },
+
   demoCardViewer: {
     flex: 1,
     alignItems: "center",
@@ -405,6 +527,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   topControls: {
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -454,7 +577,9 @@ const styles = StyleSheet.create({
   },
   bottomSheet: {
     marginTop: "auto",
-    marginHorizontal: 14,
+    alignSelf: "center",
+    width: "92%",
+    maxWidth: 402,
     marginBottom: 14,
     borderRadius: 28,
     borderWidth: 1,

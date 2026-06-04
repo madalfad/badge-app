@@ -1,0 +1,54 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "framework": [
+    {
+      "name": "badge-app-expo-native-platform",
+      "detection": { "type": "dependency", "package": "expo" },
+      "alwaysUsed": [
+        "src/components/animated-icon.tsx",
+        "src/db/databaseClient.native.ts",
+        "src/db/database.native.ts",
+        "src/db/migrations.ts",
+        "src/features/security/appLockStore.native.ts",
+      ],
+      "usedExports": [
+        {
+          "pattern": "src/components/animated-icon.tsx",
+          "exports": ["AnimatedSplashOverlay"],
+        },
+        {
+          "pattern": "src/db/databaseClient.native.ts",
+          "exports": ["getDatabase"],
+        },
+        {
+          "pattern": "src/db/database.native.ts",
+          "exports": ["getDatabase"],
+        },
+        {
+          "pattern": "src/db/migrations.ts",
+          "exports": ["migrateDbIfNeeded"],
+        },
+        {
+          "pattern": "src/features/security/appLockStore.native.ts",
+          "exports": [
+            "getStoredAppLockPin",
+            "setStoredAppLockPin",
+            "clearStoredAppLockPin",
+            "getDeviceAuthAvailability",
+            "authenticateWithDevice",
+          ],
+        },
+      ],
+    },
+  ],
+  "ignoreDependencies": [
+    "expo-dev-client",
+    "expo-splash-screen",
+    "react-native-web",
+  ],
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+    "maxCrap": 1000,
+  },
+}

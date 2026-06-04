@@ -157,14 +157,14 @@ function FilterChip({ label, selected, onPress }: FilterChipProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 22,
-    marginTop: 14,
-    borderRadius: 24,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#26364F",
     backgroundColor: "#101C2EE6",
-    padding: 12,
-    gap: 10,
+    padding: 11,
+    gap: 9,
   },
   searchRow: {
     flexDirection: "row",
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     minHeight: 44,
-    borderRadius: 16,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: "#26364F",
     backgroundColor: "#07111F",
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     minHeight: 44,
-    borderRadius: 16,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: "#26364F",
     backgroundColor: "#17243A",

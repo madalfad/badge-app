@@ -50,7 +50,7 @@ function getContainedSize(
   };
 }
 
-function getMaxTranslateX(
+function getMaxTranslateBounds(
   scale: number,
   containerWidth: number,
   containerHeight: number,
@@ -64,24 +64,11 @@ function getMaxTranslateX(
     imageWidth,
     imageHeight,
   );
-  return Math.max(0, (containedSize.width * scale - containerWidth) / 2);
-}
 
-function getMaxTranslateY(
-  scale: number,
-  containerWidth: number,
-  containerHeight: number,
-  imageWidth: number,
-  imageHeight: number,
-) {
-  "worklet";
-  const containedSize = getContainedSize(
-    containerWidth,
-    containerHeight,
-    imageWidth,
-    imageHeight,
-  );
-  return Math.max(0, (containedSize.height * scale - containerHeight) / 2);
+  return {
+    x: Math.max(0, (containedSize.width * scale - containerWidth) / 2),
+    y: Math.max(0, (containedSize.height * scale - containerHeight) / 2),
+  };
 }
 
 type ZoomableImageProps = {
@@ -140,6 +127,24 @@ export function ZoomableImage({
     containerHeight.value = event.nativeEvent.layout.height;
   };
 
+  const resetTransform = () => {
+    "worklet";
+    scale.value = withTiming(1);
+    translateX.value = withTiming(0);
+    translateY.value = withTiming(0);
+    savedScale.value = 1;
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+  };
+
+  const resetTranslation = () => {
+    "worklet";
+    translateX.value = withTiming(0);
+    translateY.value = withTiming(0);
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+  };
+
   const pinchGesture = Gesture.Pinch()
     .onBegin(() => {
       savedScale.value = scale.value;
@@ -150,14 +155,7 @@ export function ZoomableImage({
         MIN_SCALE,
         MAX_SCALE,
       );
-      const maxX = getMaxTranslateX(
-        nextScale,
-        containerWidth.value,
-        containerHeight.value,
-        naturalImageWidth.value,
-        naturalImageHeight.value,
-      );
-      const maxY = getMaxTranslateY(
+      const bounds = getMaxTranslateBounds(
         nextScale,
         containerWidth.value,
         containerHeight.value,
@@ -166,36 +164,24 @@ export function ZoomableImage({
       );
 
       scale.value = nextScale;
-      translateX.value = clamp(translateX.value, -maxX, maxX);
-      translateY.value = clamp(translateY.value, -maxY, maxY);
+      translateX.value = clamp(translateX.value, -bounds.x, bounds.x);
+      translateY.value = clamp(translateY.value, -bounds.y, bounds.y);
     })
     .onEnd(() => {
       if (scale.value <= 1.03) {
-        scale.value = withTiming(1);
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        savedScale.value = 1;
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
+        resetTransform();
         return;
       }
 
-      const maxX = getMaxTranslateX(
+      const bounds = getMaxTranslateBounds(
         scale.value,
         containerWidth.value,
         containerHeight.value,
         naturalImageWidth.value,
         naturalImageHeight.value,
       );
-      const maxY = getMaxTranslateY(
-        scale.value,
-        containerWidth.value,
-        containerHeight.value,
-        naturalImageWidth.value,
-        naturalImageHeight.value,
-      );
-      const nextX = clamp(translateX.value, -maxX, maxX);
-      const nextY = clamp(translateY.value, -maxY, maxY);
+      const nextX = clamp(translateX.value, -bounds.x, bounds.x);
+      const nextY = clamp(translateY.value, -bounds.y, bounds.y);
 
       translateX.value = withTiming(nextX);
       translateY.value = withTiming(nextY);
@@ -210,14 +196,7 @@ export function ZoomableImage({
       savedTranslateY.value = translateY.value;
     })
     .onUpdate((event) => {
-      const maxX = getMaxTranslateX(
-        scale.value,
-        containerWidth.value,
-        containerHeight.value,
-        naturalImageWidth.value,
-        naturalImageHeight.value,
-      );
-      const maxY = getMaxTranslateY(
+      const bounds = getMaxTranslateBounds(
         scale.value,
         containerWidth.value,
         containerHeight.value,
@@ -227,21 +206,18 @@ export function ZoomableImage({
 
       translateX.value = clamp(
         savedTranslateX.value + event.translationX,
-        -maxX,
-        maxX,
+        -bounds.x,
+        bounds.x,
       );
       translateY.value = clamp(
         savedTranslateY.value + event.translationY,
-        -maxY,
-        maxY,
+        -bounds.y,
+        bounds.y,
       );
     })
     .onEnd(() => {
       if (scale.value <= 1.03) {
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
+        resetTranslation();
         return;
       }
 
@@ -253,12 +229,7 @@ export function ZoomableImage({
     .numberOfTaps(2)
     .onEnd(() => {
       if (scale.value > 1.05) {
-        scale.value = withTiming(1);
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        savedScale.value = 1;
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
+        resetTransform();
         return;
       }
 

@@ -3,32 +3,40 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useBadgeLayout } from "@/components/badge-ui";
 import { useDatabaseContext } from "@/db/DatabaseProvider";
+import { CardEditorHeader } from "@/features/cards/CardEditorHeader";
+import { CardFormField } from "@/features/cards/CardFormField";
+import { NativeStorageWarning } from "@/features/cards/NativeStorageWarning";
+import { DEFAULT_REEL_ID } from "@/features/reels/constants";
+import { ReelMembershipField } from "@/features/reels/ReelMembershipField";
+import { useReels } from "@/features/reels/useReels";
 import { createCardFromImages } from "@/features/cards/cardService";
+import {
+  CARD_ACCENT_PRESETS,
+  parseCardTags,
+} from "@/features/cards/cardMetadata";
+import {
+  launchCardImagePicker,
+  type CardImagePickerSource,
+} from "@/features/cards/cardImagePicker";
 import type { CropPreset, SourceCardImage } from "@/storage/imagePipeline";
 
 type CardSide = "front" | "back";
 type PickedCardImage = SourceCardImage & {
   previewUri: string;
 };
-
-type PickerSource = "camera" | "library";
-
-const ACCENT_PRESETS = ["#2DD4BF", "#60A5FA", "#A78BFA", "#FBBF24", "#F87171"];
 
 function toPickedImage(asset: ImagePicker.ImagePickerAsset): PickedCardImage {
   return {
@@ -43,20 +51,11 @@ function toPickedImage(asset: ImagePicker.ImagePickerAsset): PickedCardImage {
   };
 }
 
-function parseTags(tagsText: string) {
-  return Array.from(
-    new Set(
-      tagsText
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
 export function AddCardSourceScreen() {
   const router = useRouter();
+  const layout = useBadgeLayout();
   const { db, isReady } = useDatabaseContext();
+  const reelsState = useReels();
   const [frontImage, setFrontImage] = useState<PickedCardImage | null>(null);
   const [backImage, setBackImage] = useState<PickedCardImage | null>(null);
   const [title, setTitle] = useState("");
@@ -64,13 +63,30 @@ export function AddCardSourceScreen() {
   const [category, setCategory] = useState("");
   const [tagsText, setTagsText] = useState("");
   const [cropPreset, setCropPreset] = useState<CropPreset>("auto");
-  const [accentColor, setAccentColor] = useState(ACCENT_PRESETS[0]);
+  const [accentColor, setAccentColor] = useState(CARD_ACCENT_PRESETS[0]);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [selectedReelIds, setSelectedReelIds] = useState<string[]>([]);
+  const [hasInitializedReels, setHasInitializedReels] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const canSave = Boolean(
     db && frontImage && title.trim().length > 0 && !isSaving,
   );
+
+  useEffect(() => {
+    if (hasInitializedReels || reelsState.reels.length === 0) {
+      return;
+    }
+
+    const preferredReelId = reelsState.selectedReelId ?? DEFAULT_REEL_ID;
+    const initialReelId = reelsState.reels.some(
+      (reel) => reel.id === preferredReelId,
+    )
+      ? preferredReelId
+      : reelsState.reels[0].id;
+    setSelectedReelIds([initialReelId]);
+    setHasInitializedReels(true);
+  }, [hasInitializedReels, reelsState.reels, reelsState.selectedReelId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -102,55 +118,26 @@ export function AddCardSourceScreen() {
     };
   }, []);
 
-  const tags = useMemo(() => parseTags(tagsText), [tagsText]);
+  const tags = useMemo(() => parseCardTags(tagsText), [tagsText]);
 
-  const requestPermission = async (source: PickerSource) => {
-    if (source === "camera") {
-      const result = await ImagePicker.requestCameraPermissionsAsync();
-      return result.granted;
-    }
+  const launchPicker = async (
+    side: CardSide,
+    source: CardImagePickerSource,
+  ) => {
+    const asset = await launchCardImagePicker(source, {
+      camera: "Camera permission is required to capture a badge card.",
+      library: "Photo library permission is required to import a badge card.",
+    });
 
-    const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    return result.granted;
-  };
-
-  const launchPicker = async (side: CardSide, source: PickerSource) => {
-    const hasPermission = await requestPermission(source);
-    if (!hasPermission) {
-      Alert.alert(
-        "Permission required",
-        source === "camera"
-          ? "Camera permission is required to capture a badge card."
-          : "Photo library permission is required to import a badge card.",
-      );
+    if (!asset) {
       return;
     }
 
-    const result =
-      source === "camera"
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ["images"],
-            allowsEditing: false,
-            quality: 1,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            allowsEditing: false,
-            quality: 1,
-          });
-
-    if (result.canceled || !result.assets[0]) {
-      return;
-    }
-
-    const nextImage = toPickedImage(result.assets[0]);
+    const nextImage = toPickedImage(asset);
     if (side === "front") {
       setFrontImage(nextImage);
       if (!title.trim()) {
-        const nameWithoutExtension = result.assets[0].fileName?.replace(
-          /\.[^/.]+$/,
-          "",
-        );
+        const nameWithoutExtension = asset.fileName?.replace(/\.[^/.]+$/, "");
         setTitle(nameWithoutExtension || "New badge card");
       }
       return;
@@ -201,6 +188,7 @@ export function AddCardSourceScreen() {
         primaryColor: accentColor,
         frontImage: { ...frontImage, cropPreset },
         backImage: backImage ? { ...backImage, cropPreset } : null,
+        reelIds: selectedReelIds,
       });
 
       router.replace({
@@ -222,48 +210,34 @@ export function AddCardSourceScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
         style={styles.keyboardAvoidingView}
       >
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.back()}
-            style={styles.headerButton}
-          >
-            <Text style={styles.headerButtonText}>Cancel</Text>
-          </Pressable>
-          <View style={styles.headerTitleBlock}>
-            <Text style={styles.eyebrow}>Import card</Text>
-            <Text style={styles.headerTitle}>Add badge card</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!canSave}
-            onPress={handleSave}
-            style={[styles.saveButton, !canSave && styles.disabledButton]}
-          >
-            {isSaving ? (
-              <ActivityIndicator color="#04111F" />
-            ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
-            )}
-          </Pressable>
-        </View>
+        <CardEditorHeader
+          eyebrow="Import card"
+          title="Add badge card"
+          canSave={canSave}
+          isSaving={isSaving}
+          onCancel={() => router.back()}
+          onSave={handleSave}
+        />
 
         <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            {
+              alignSelf: "center",
+              maxWidth: layout.contentMaxWidth,
+              paddingHorizontal: layout.gutter,
+              width: "100%",
+            },
+          ]}
         >
           {!db && isReady ? (
-            <View style={styles.warningBox}>
-              <Text style={styles.warningTitle}>Native build required</Text>
-              <Text style={styles.warningText}>
-                The add-card flow uses SQLite, file storage, image picker, and
-                image manipulation. Test it in a development build.
-              </Text>
-            </View>
+            <NativeStorageWarning text="The add-card flow uses SQLite, file storage, image picker, and image manipulation. Test it in a development build." />
           ) : null}
 
           <View style={styles.section}>
@@ -314,25 +288,25 @@ export function AddCardSourceScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Metadata</Text>
-            <FormField
+            <CardFormField
               label="Title"
               value={title}
               placeholder="e.g. Sepsis quick guide"
               onChangeText={setTitle}
             />
-            <FormField
+            <CardFormField
               label="Subtitle"
               value={subtitle}
               placeholder="Optional note or source"
               onChangeText={setSubtitle}
             />
-            <FormField
+            <CardFormField
               label="Category"
               value={category}
               placeholder="e.g. ICU, ED, Pediatrics"
               onChangeText={setCategory}
             />
-            <FormField
+            <CardFormField
               label="Tags"
               value={tagsText}
               placeholder="comma, separated, tags"
@@ -350,10 +324,17 @@ export function AddCardSourceScreen() {
             </View>
           </View>
 
+          <ReelMembershipField
+            reels={reelsState.reels}
+            selectedReelIds={selectedReelIds}
+            disabled={reelsState.isLoading || isSaving}
+            onChange={setSelectedReelIds}
+          />
+
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Accent color</Text>
             <View style={styles.colorRow}>
-              {ACCENT_PRESETS.map((color) => (
+              {CARD_ACCENT_PRESETS.map((color) => (
                 <Pressable
                   key={color}
                   accessibilityRole="button"
@@ -442,33 +423,6 @@ function ImagePickerPanel({
   );
 }
 
-type FormFieldProps = {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChangeText: (value: string) => void;
-};
-
-function FormField({
-  label,
-  value,
-  placeholder,
-  onChangeText,
-}: FormFieldProps) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        placeholder={placeholder}
-        placeholderTextColor="#64748B"
-        onChangeText={onChangeText}
-        style={styles.input}
-      />
-    </View>
-  );
-}
-
 type SegmentButtonProps = {
   label: string;
   selected: boolean;
@@ -537,88 +491,13 @@ const styles = StyleSheet.create({
   keyboardAvoidingView: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingTop: 8,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#26364F",
-  },
-  headerButton: {
-    minWidth: 74,
-    borderRadius: 999,
-    backgroundColor: "#17243A",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  headerButtonText: {
-    color: "#F8FAFC",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  headerTitleBlock: {
-    flex: 1,
-    alignItems: "center",
-  },
-  eyebrow: {
-    color: "#2DD4BF",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  headerTitle: {
-    color: "#F8FAFC",
-    fontSize: 20,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-  saveButton: {
-    minWidth: 74,
-    minHeight: 40,
-    borderRadius: 999,
-    backgroundColor: "#2DD4BF",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  saveButtonText: {
-    color: "#04111F",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  disabledButton: {
-    opacity: 0.42,
-  },
+
   content: {
     padding: 18,
     paddingBottom: 38,
     gap: 18,
   },
-  warningBox: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#FBBF2477",
-    backgroundColor: "#FBBF241A",
-    padding: 16,
-  },
-  warningTitle: {
-    color: "#FBBF24",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  warningText: {
-    color: "#FDE68A",
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: "700",
-    marginTop: 6,
-  },
+
   section: {
     borderRadius: 26,
     borderWidth: 1,
@@ -755,9 +634,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: "700",
   },
-  field: {
-    gap: 8,
-  },
+
   inputLabel: {
     color: "#CBD5E1",
     fontSize: 12,
@@ -765,17 +642,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
-  input: {
-    minHeight: 48,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#26364F",
-    backgroundColor: "#07111F",
-    color: "#F8FAFC",
-    fontSize: 15,
-    fontWeight: "700",
-    paddingHorizontal: 14,
-  },
+
   favoriteRow: {
     flexDirection: "row",
     alignItems: "center",

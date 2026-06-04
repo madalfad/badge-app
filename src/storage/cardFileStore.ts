@@ -8,17 +8,17 @@ type StoredCardAssetFiles = {
   thumbnailUri?: string | null;
 };
 
-export function getCardsDirectory() {
+function getCardsDirectory() {
   return new Directory(Paths.document, CARDS_DIRECTORY_NAME);
 }
 
-export function ensureCardsDirectory() {
+function ensureCardsDirectory() {
   const directory = getCardsDirectory();
   directory.create({ idempotent: true, intermediates: true });
   return directory;
 }
 
-export function getCardDirectory(cardId: string) {
+function getCardDirectory(cardId: string) {
   return new Directory(getCardsDirectory(), cardId);
 }
 
@@ -27,10 +27,6 @@ export function ensureCardDirectory(cardId: string) {
   const directory = getCardDirectory(cardId);
   directory.create({ idempotent: true, intermediates: true });
   return directory;
-}
-
-export function getCardFile(cardId: string, fileName: string) {
-  return new File(getCardDirectory(cardId), fileName);
 }
 
 export async function copyFileToCardDirectory(
@@ -45,7 +41,7 @@ export async function copyFileToCardDirectory(
   return destination.uri;
 }
 
-export function deleteFileIfExists(uri: string | null | undefined) {
+function deleteFileIfExists(uri: string | null | undefined) {
   if (!uri) {
     return;
   }

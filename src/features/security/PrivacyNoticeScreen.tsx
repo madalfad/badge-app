@@ -1,5 +1,7 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { BadgeButton, BadgePanel, BadgeScrollScreen } from "@/components/badge-ui";
 
 type PrivacyNoticeScreenProps = {
   isSaving?: boolean;
@@ -12,7 +14,7 @@ export function PrivacyNoticeScreen({
 }: PrivacyNoticeScreenProps) {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-      <View style={styles.content}>
+      <BadgeScrollScreen contentContainerStyle={styles.content}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>BadgeDeck</Text>
         </View>
@@ -22,7 +24,7 @@ export function PrivacyNoticeScreen({
           device for quick offline access.
         </Text>
 
-        <View style={styles.noticeCard}>
+        <BadgePanel style={styles.noticeCard}>
           <NoticeItem
             title="Local-only MVP"
             text="Cards are saved in app storage and SQLite on this device. Cloud sync and accounts are not part of this build."
@@ -35,25 +37,17 @@ export function PrivacyNoticeScreen({
             title="Reference only"
             text="Badge cards can become outdated. Verify clinical decisions against your local protocols and reviewed sources."
           />
-        </View>
+        </BadgePanel>
 
-        <Pressable
-          accessibilityRole="button"
+        <BadgeButton
           disabled={isSaving}
+          label="I understand"
+          loading={isSaving}
           onPress={onAccept}
-          style={({ pressed }) => [
-            styles.acceptButton,
-            isSaving && styles.disabledButton,
-            pressed && !isSaving && styles.pressed,
-          ]}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="#04111F" />
-          ) : (
-            <Text style={styles.acceptButtonText}>I understand</Text>
-          )}
-        </Pressable>
-      </View>
+          style={styles.acceptButton}
+          variant="primary"
+        />
+      </BadgeScrollScreen>
     </SafeAreaView>
   );
 }
@@ -81,9 +75,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#07111F",
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
-    padding: 24,
     gap: 20,
   },
   badge: {
@@ -107,7 +100,6 @@ const styles = StyleSheet.create({
     fontSize: 34,
     lineHeight: 39,
     fontWeight: "900",
-    letterSpacing: -1.1,
   },
   subtitle: {
     color: "#CBD5E1",
@@ -116,11 +108,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   noticeCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "#26364F",
-    backgroundColor: "#101C2E",
-    padding: 18,
     gap: 16,
   },
   noticeItem: {
@@ -151,21 +138,5 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     minHeight: 54,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#2DD4BF",
-    paddingHorizontal: 18,
-  },
-  acceptButtonText: {
-    color: "#04111F",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  pressed: {
-    opacity: 0.8,
   },
 });

@@ -7,13 +7,18 @@ export const springConfig = {
   overshootClamping: false,
 } as const;
 
-export function clamp(value: number, min: number, max: number) {
-  'worklet';
+function clamp(value: number, min: number, max: number) {
+  "worklet";
   return Math.min(Math.max(value, min), max);
 }
 
-export function getProjectedIndex(progress: number, velocityY: number, itemSpacing: number, cardCount: number) {
-  'worklet';
+export function getProjectedIndex(
+  progress: number,
+  velocityY: number,
+  itemSpacing: number,
+  cardCount: number,
+) {
+  "worklet";
   const projected = progress - velocityY / (itemSpacing * 7);
   return clamp(Math.round(projected), 0, Math.max(cardCount - 1, 0));
 }

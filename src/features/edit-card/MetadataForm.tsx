@@ -1,12 +1,7 @@
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
-export const EDIT_CARD_ACCENT_PRESETS = [
-  "#2DD4BF",
-  "#60A5FA",
-  "#A78BFA",
-  "#FBBF24",
-  "#F87171",
-];
+import { CardFormField } from "@/features/cards/CardFormField";
+import { CARD_ACCENT_PRESETS } from "@/features/cards/cardMetadata";
 
 type MetadataFormProps = {
   title: string;
@@ -40,25 +35,25 @@ export function MetadataForm({
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Metadata</Text>
-      <FormField
+      <CardFormField
         label="Title"
         value={title}
         placeholder="e.g. Sepsis quick guide"
         onChangeText={onTitleChange}
       />
-      <FormField
+      <CardFormField
         label="Subtitle"
         value={subtitle}
         placeholder="Optional note or source"
         onChangeText={onSubtitleChange}
       />
-      <FormField
+      <CardFormField
         label="Category"
         value={category}
         placeholder="e.g. ICU, ED, Pediatrics"
         onChangeText={onCategoryChange}
       />
-      <FormField
+      <CardFormField
         label="Tags"
         value={tagsText}
         placeholder="comma, separated, tags"
@@ -68,7 +63,9 @@ export function MetadataForm({
       <View style={styles.favoriteRow}>
         <View style={styles.favoriteCopy}>
           <Text style={styles.inputLabel}>Favorite</Text>
-          <Text style={styles.helperText}>Pin this card visually in the reel.</Text>
+          <Text style={styles.helperText}>
+            Pin this card visually in the reel.
+          </Text>
         </View>
         <Switch value={isFavorite} onValueChange={onFavoriteChange} />
       </View>
@@ -76,7 +73,7 @@ export function MetadataForm({
       <View style={styles.colorGroup}>
         <Text style={styles.inputLabel}>Accent color</Text>
         <View style={styles.colorRow}>
-          {EDIT_CARD_ACCENT_PRESETS.map((color) => (
+          {CARD_ACCENT_PRESETS.map((color) => (
             <Pressable
               key={color}
               accessibilityRole="button"
@@ -96,28 +93,6 @@ export function MetadataForm({
   );
 }
 
-type FormFieldProps = {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChangeText: (value: string) => void;
-};
-
-function FormField({ label, value, placeholder, onChangeText }: FormFieldProps) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        placeholder={placeholder}
-        placeholderTextColor="#64748B"
-        onChangeText={onChangeText}
-        style={styles.input}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   section: {
     borderRadius: 24,
@@ -132,9 +107,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900",
   },
-  field: {
-    gap: 7,
-  },
+
   inputLabel: {
     color: "#CBD5E1",
     fontSize: 12,
@@ -142,17 +115,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     textTransform: "uppercase",
   },
-  input: {
-    minHeight: 48,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#26364F",
-    backgroundColor: "#07111F",
-    color: "#F8FAFC",
-    fontSize: 15,
-    fontWeight: "700",
-    paddingHorizontal: 14,
-  },
+
   helperText: {
     color: "#94A3B8",
     fontSize: 12,

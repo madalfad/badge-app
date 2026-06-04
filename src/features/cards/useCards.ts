@@ -5,10 +5,15 @@ import {
   markViewed,
   toggleFavorite as toggleFavoriteInDb,
 } from "@/db/repositories/cardsRepository";
+import { listCardsForReel } from "@/db/repositories/reelsRepository";
 import { useDatabaseContext } from "@/db/DatabaseProvider";
 
 import { sampleBadgeCards } from "../reel/sampleCards";
 import type { BadgeCard } from "./types";
+
+type UseCardsOptions = {
+  reelId?: string | null;
+};
 
 type UseCardsResult = {
   cards: BadgeCard[];
@@ -33,8 +38,9 @@ function markViewedInMemory(cards: BadgeCard[], cardId: string) {
   );
 }
 
-export function useCards(): UseCardsResult {
+export function useCards(options: UseCardsOptions = {}): UseCardsResult {
   const { db, error: databaseError, isReady } = useDatabaseContext();
+  const reelId = options.reelId ?? null;
   const [cards, setCards] = useState<BadgeCard[]>([]);
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,8 +58,10 @@ export function useCards(): UseCardsResult {
         return;
       }
 
-      const nextCards = await listCards(db, { includeArchived: true });
-      setCards(nextCards.length > 0 ? nextCards : sampleBadgeCards);
+      const nextCards = reelId
+        ? await listCardsForReel(db, reelId, { includeArchived: true })
+        : await listCards(db, { includeArchived: true });
+      setCards(nextCards.length > 0 || reelId ? nextCards : sampleBadgeCards);
       setLoadError(null);
     } catch (caughtError) {
       setCards(sampleBadgeCards);
@@ -65,7 +73,7 @@ export function useCards(): UseCardsResult {
     } finally {
       setIsLoading(false);
     }
-  }, [databaseError, db, isReady]);
+  }, [databaseError, db, isReady, reelId]);
 
   useEffect(() => {
     reload();

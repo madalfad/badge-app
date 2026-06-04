@@ -1,6 +1,8 @@
 import { upsertCategory } from "@/db/repositories/categoriesRepository";
 import { upsertCard } from "@/db/repositories/cardsRepository";
+import { addCardToReel } from "@/db/repositories/reelsRepository";
 import { getSetting, setSetting } from "@/db/repositories/settingsRepository";
+import { DEFAULT_REEL_ID } from "@/features/reels/constants";
 import type { AppDatabase } from "@/db/types";
 import { withWriteTransaction } from "@/db/types";
 import { sampleBadgeCards } from "@/features/reel/sampleCards";
@@ -38,6 +40,7 @@ export async function ensureSampleCardsSeeded(db: AppDatabase) {
           footer: card.footer,
         }),
       });
+      await addCardToReel(txn, DEFAULT_REEL_ID, card.id, index);
     }
 
     await setSetting(txn, SAMPLE_SEED_SETTING, SAMPLE_SEED_VERSION);

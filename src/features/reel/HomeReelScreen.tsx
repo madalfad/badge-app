@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -11,8 +11,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import {
+  BadgeIconButton,
+  badgeColors,
+  useBadgeLayout,
+} from "@/components/badge-ui";
+import { useDatabaseContext } from "@/db/DatabaseProvider";
+import { removeCardFromReel } from "@/db/repositories/reelsRepository";
 import type { BadgeCard } from "@/features/cards/types";
 import { useCards } from "@/features/cards/useCards";
+import { ReelSelector } from "@/features/reels/ReelSelector";
+import { useReels } from "@/features/reels/useReels";
 import { SearchFilterBar } from "@/features/search/SearchFilterBar";
 import { SearchResultsList } from "@/features/search/SearchResultsList";
 import {
@@ -24,6 +33,9 @@ import { useBooleanSetting } from "@/features/settings/useBooleanSetting";
 import { BadgeReel } from "./BadgeReel";
 export function HomeReelScreen() {
   const router = useRouter();
+  const layout = useBadgeLayout();
+  const { db } = useDatabaseContext();
+  const reelsState = useReels();
   const {
     cards,
     error,
@@ -32,7 +44,7 @@ export function HomeReelScreen() {
     markCardViewed,
     reload,
     toggleFavorite,
-  } = useCards();
+  } = useCards({ reelId: reelsState.selectedReelId });
   const [reduceMotion, setReduceMotion] = useBooleanSetting(
     "reduce_motion_enabled",
     false,
@@ -53,10 +65,6 @@ export function HomeReelScreen() {
     }, [reload]),
   );
 
-  const favoriteCount = useMemo(
-    () => cards.filter((card) => card.isFavorite && !card.isArchived).length,
-    [cards],
-  );
   const {
     activeCards,
     archivedCards,
@@ -84,194 +92,279 @@ export function HomeReelScreen() {
     router.push({ pathname: "/card/[id]", params: { id: card.id } });
   };
 
+  const clearSearch = () => {
+    setSearchQuery("");
+    setCardFilter({ type: "all" });
+  };
+
+  const closeQuickActions = () => setQuickActionCard(null);
+  const selectedReelLabel = reelsState.selectedReelId
+    ? (reelsState.reels.find((reel) => reel.id === reelsState.selectedReelId)
+        ?.name ?? "Reel")
+    : "All cards";
+
+  const favoriteQuickActionCard = () => {
+    if (!quickActionCard) {
+      return;
+    }
+
+    handleFavoriteToggle(quickActionCard);
+    closeQuickActions();
+  };
+
+  const openQuickActionCard = () => {
+    if (!quickActionCard) {
+      return;
+    }
+
+    handleCardPress(quickActionCard);
+    closeQuickActions();
+  };
+
+  const editQuickActionCard = () => {
+    if (!quickActionCard) {
+      return;
+    }
+
+    router.push({
+      pathname: "/card/[id]/edit",
+      params: { id: quickActionCard.id },
+    });
+    closeQuickActions();
+  };
+
+  const removeQuickActionCardFromReel = async () => {
+    if (!db || !quickActionCard || !reelsState.selectedReelId) {
+      return;
+    }
+
+    await removeCardFromReel(db, reelsState.selectedReelId, quickActionCard.id);
+    closeQuickActions();
+    await Promise.all([reload(), reelsState.reload()]);
+  };
+
   return (
     <View style={styles.screen}>
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>Offline reference library</Text>
-            <Text style={styles.title}>BadgeDeck</Text>
-            <Text style={styles.subtitle}>
-              A tactile 3D reel for badge reference cards.
-            </Text>
-          </View>
-          <View style={styles.headerActions}>
-            <View style={styles.topButtonRow}>
-              <Pressable
-                accessibilityRole="button"
+        <View
+          style={[
+            styles.homeShell,
+            layout.contentMaxWidth ? { maxWidth: layout.contentMaxWidth } : null,
+          ]}
+        >
+          <View style={styles.appBar}>
+            <View style={styles.titleCluster}>
+              <Text style={styles.appEyebrow}>BadgeDeck</Text>
+              <Text numberOfLines={1} style={styles.appTitle}>
+                {selectedReelLabel}
+              </Text>
+              <Text numberOfLines={1} style={styles.appMeta}>
+                {activeCards.length} active / {isPersisted ? "local" : "demo"}
+              </Text>
+            </View>
+            <View style={styles.appActions}>
+              <BadgeIconButton
+                accessibilityLabel="Open settings"
+                icon="..."
                 onPress={() => router.push("/settings")}
-                style={({ pressed }) => [
-                  styles.settingsButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.settingsButtonText}>Settings</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
+              />
+              <BadgeIconButton
+                accessibilityLabel="Add card"
+                icon="+"
                 onPress={() => router.push("/add")}
-                style={({ pressed }) => [
-                  styles.addButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.addButtonText}>+ Add</Text>
-              </Pressable>
-            </View>
-            <View style={styles.statsPill}>
-              <Text style={styles.statsNumber}>{activeCards.length}</Text>
-              <Text style={styles.statsLabel}>active</Text>
+                variant="primary"
+              />
             </View>
           </View>
-        </View>
 
-        <View style={styles.controlsRow}>
-          <ToggleButton
-            label="3D reel"
-            selected={!reduceMotion}
-            onPress={() => setReduceMotion(false)}
-          />
-          <ToggleButton
-            label="Reduced motion"
-            selected={reduceMotion}
-            onPress={() => setReduceMotion(true)}
-          />
-          <ToggleButton
-            label="Haptics"
-            selected={hapticsEnabled}
-            onPress={() => setHapticsEnabled((enabled) => !enabled)}
-          />
-        </View>
+          <View style={styles.controlsRow}>
+            <ToggleButton
+              label="3D"
+              selected={!reduceMotion}
+              onPress={() => setReduceMotion(false)}
+            />
+            <ToggleButton
+              label="Calm"
+              selected={reduceMotion}
+              onPress={() => setReduceMotion(true)}
+            />
+            <ToggleButton
+              label="Haptic"
+              selected={hapticsEnabled}
+              onPress={() => setHapticsEnabled((enabled) => !enabled)}
+            />
+          </View>
 
-        <SearchFilterBar
-          query={searchQuery}
-          filter={cardFilter}
-          categories={categories}
-          tags={tags}
-          resultCount={filteredCards.length}
-          totalCount={cards.length}
-          onQueryChange={setSearchQuery}
-          onFilterChange={setCardFilter}
-        />
-
-        {error ? (
-          <InlineNotice
-            title={isPersisted ? "Database warning" : "Demo fallback active"}
-            text={
-              isPersisted
-                ? error.message
-                : "Native SQLite is unavailable here, so BadgeDeck is showing demo cards. Use a development build for local storage."
-            }
+          <ReelSelector
+            reels={reelsState.reels}
+            selectedReelId={reelsState.selectedReelId}
+            allActiveCardCount={reelsState.allActiveCardCount}
+            isLoading={reelsState.isLoading}
+            onSelectReel={(reelId) => {
+              reelsState.selectReel(reelId).catch(() => undefined);
+            }}
+            onCreateReel={reelsState.createNewReel}
+            onUpdateReel={reelsState.updateExistingReel}
+            onArchiveReel={reelsState.archiveExistingReel}
+            onDeleteReel={reelsState.deleteExistingReel}
+            onMoveReel={reelsState.moveReel}
           />
-        ) : null}
 
-        <View style={styles.reelWrapper}>
-          {cards.length === 0 && isLoading ? (
-            <StatePanel
-              title="Loading cards…"
-              text="Opening your local badge card library."
+          <SearchFilterBar
+            query={searchQuery}
+            filter={cardFilter}
+            categories={categories}
+            tags={tags}
+            resultCount={filteredCards.length}
+            totalCount={cards.length}
+            onQueryChange={setSearchQuery}
+            onFilterChange={setCardFilter}
+          />
+
+          {error ? (
+            <InlineNotice
+              title={isPersisted ? "Database warning" : "Demo fallback active"}
+              text={
+                isPersisted
+                  ? error.message
+                  : "Native SQLite is unavailable here, so BadgeDeck is showing demo cards. Use a development build for local storage."
+              }
             />
-          ) : cards.length === 0 ? (
-            <StatePanel
-              title="No cards yet"
-              text="Add your first badge reference card to start building the reel."
-              actionLabel="Add card"
-              onAction={() => router.push("/add")}
-            />
-          ) : filteredCards.length === 0 &&
-            !isFiltering &&
-            archivedCards.length > 0 ? (
-            <StatePanel
-              title="No active cards"
-              text="All cards are archived. Use the Archived filter to review or restore them."
-              actionLabel="View archived"
-              onAction={() => setCardFilter({ type: "archived" })}
-            />
-          ) : filteredCards.length === 0 ? (
-            <StatePanel
-              title="No matching cards"
-              text="Try another search term or clear the active filter."
-              actionLabel="Clear search"
-              onAction={() => {
-                setSearchQuery("");
-                setCardFilter({ type: "all" });
-              }}
-            />
-          ) : isFiltering ? (
-            <SearchResultsList
-              cards={filteredCards}
-              onCardLongPress={setQuickActionCard}
-              onCardPress={handleCardPress}
-              onFavoriteToggle={handleFavoriteToggle}
-            />
-          ) : (
-            <BadgeReel
-              cards={filteredCards}
+          ) : null}
+
+          <View
+            style={[
+              styles.reelWrapper,
+              layout.isCompactHeight && styles.compactReelWrapper,
+            ]}
+          >
+            <HomeReelContent
+              archivedCards={archivedCards}
+              cards={cards}
+              filteredCards={filteredCards}
               hapticsEnabled={hapticsEnabled}
+              isFiltering={isFiltering}
+              isLoading={isLoading}
               reduceMotion={reduceMotion}
+              onAddCard={() => router.push("/add")}
               onCardLongPress={setQuickActionCard}
               onCardPress={handleCardPress}
+              onClearSearch={clearSearch}
               onFavoriteToggle={handleFavoriteToggle}
+              onViewArchived={() => setCardFilter({ type: "archived" })}
             />
-          )}
-        </View>
-
-        <View style={styles.footerPanel}>
-          <Text style={styles.footerTitle}>Badge reel</Text>
-          <Text style={styles.footerText}>
-            Swipe vertically to spin the reel. Tap the focused card to open the
-            zoomable viewer. Double tap any card to favorite. Long press for
-            quick actions.
-          </Text>
-          <View style={styles.footerStatsRow}>
-            <Text style={styles.footerStat}>{favoriteCount} favorites</Text>
-            {archivedCards.length > 0 ? (
-              <Text style={styles.footerStat}>
-                {archivedCards.length} archived
-              </Text>
-            ) : null}
-            <Text style={styles.footerStat}>
-              {isPersisted ? "SQLite backed" : "Demo fallback"}
-            </Text>
-            {isLoading && (
-              <Text style={styles.footerStat}>Loading database…</Text>
-            )}
-            {isFiltering && (
-              <Text style={styles.footerStat}>
-                {filteredCards.length} shown
-              </Text>
-            )}
-            {error && <Text style={styles.footerStat}>Fallback active</Text>}
           </View>
         </View>
       </SafeAreaView>
 
       <QuickActionsModal
         card={quickActionCard}
-        onClose={() => setQuickActionCard(null)}
-        onFavorite={() => {
-          if (quickActionCard) {
-            handleFavoriteToggle(quickActionCard);
-            setQuickActionCard(null);
-          }
-        }}
-        onOpen={() => {
-          if (quickActionCard) {
-            handleCardPress(quickActionCard);
-            setQuickActionCard(null);
-          }
-        }}
-        onEdit={() => {
-          if (quickActionCard) {
-            router.push({
-              pathname: "/card/[id]/edit",
-              params: { id: quickActionCard.id },
-            });
-            setQuickActionCard(null);
-          }
+        canRemoveFromReel={Boolean(db && reelsState.selectedReelId)}
+        onClose={closeQuickActions}
+        onEdit={editQuickActionCard}
+        onFavorite={favoriteQuickActionCard}
+        onOpen={openQuickActionCard}
+        onRemoveFromReel={() => {
+          removeQuickActionCardFromReel().catch(() => undefined);
         }}
       />
     </View>
+  );
+}
+
+type HomeReelContentProps = {
+  archivedCards: BadgeCard[];
+  cards: BadgeCard[];
+  filteredCards: BadgeCard[];
+  hapticsEnabled: boolean;
+  isFiltering: boolean;
+  isLoading: boolean;
+  reduceMotion: boolean;
+  onAddCard: () => void;
+  onCardLongPress: (card: BadgeCard) => void;
+  onCardPress: (card: BadgeCard) => void;
+  onClearSearch: () => void;
+  onFavoriteToggle: (card: BadgeCard) => void;
+  onViewArchived: () => void;
+};
+
+function HomeReelContent({
+  archivedCards,
+  cards,
+  filteredCards,
+  hapticsEnabled,
+  isFiltering,
+  isLoading,
+  reduceMotion,
+  onAddCard,
+  onCardLongPress,
+  onCardPress,
+  onClearSearch,
+  onFavoriteToggle,
+  onViewArchived,
+}: HomeReelContentProps) {
+  if (cards.length === 0 && isLoading) {
+    return (
+      <StatePanel
+        title="Loading cards…"
+        text="Opening your local badge card library."
+      />
+    );
+  }
+
+  if (cards.length === 0) {
+    return (
+      <StatePanel
+        title="No cards yet"
+        text="Add your first badge reference card to start building the reel."
+        actionLabel="Add card"
+        onAction={onAddCard}
+      />
+    );
+  }
+
+  if (filteredCards.length === 0 && !isFiltering && archivedCards.length > 0) {
+    return (
+      <StatePanel
+        title="No active cards"
+        text="All cards are archived. Use the Archived filter to review or restore them."
+        actionLabel="View archived"
+        onAction={onViewArchived}
+      />
+    );
+  }
+
+  if (filteredCards.length === 0) {
+    return (
+      <StatePanel
+        title="No matching cards"
+        text="Try another search term or clear the active filter."
+        actionLabel="Clear search"
+        onAction={onClearSearch}
+      />
+    );
+  }
+
+  if (isFiltering) {
+    return (
+      <SearchResultsList
+        cards={filteredCards}
+        onCardLongPress={onCardLongPress}
+        onCardPress={onCardPress}
+        onFavoriteToggle={onFavoriteToggle}
+      />
+    );
+  }
+
+  return (
+    <BadgeReel
+      cards={filteredCards}
+      hapticsEnabled={hapticsEnabled}
+      reduceMotion={reduceMotion}
+      onCardLongPress={onCardLongPress}
+      onCardPress={onCardPress}
+      onFavoriteToggle={onFavoriteToggle}
+    />
   );
 }
 
@@ -349,18 +442,22 @@ function InlineNotice({ title, text }: InlineNoticeProps) {
 
 type QuickActionsModalProps = {
   card: BadgeCard | null;
+  canRemoveFromReel: boolean;
   onClose: () => void;
   onFavorite: () => void;
   onOpen: () => void;
   onEdit: () => void;
+  onRemoveFromReel: () => void;
 };
 
 function QuickActionsModal({
   card,
+  canRemoveFromReel,
   onClose,
   onFavorite,
   onOpen,
   onEdit,
+  onRemoveFromReel,
 }: QuickActionsModalProps) {
   return (
     <Modal
@@ -390,6 +487,12 @@ function QuickActionsModal({
                 onPress={onFavorite}
               />
               <ActionButton label="Edit card" onPress={onEdit} />
+              {canRemoveFromReel ? (
+                <ActionButton
+                  label="Remove from reel"
+                  onPress={onRemoveFromReel}
+                />
+              ) : null}
             </ScrollView>
           </View>
         )}
@@ -417,103 +520,57 @@ function ActionButton({ label, onPress }: ActionButtonProps) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#07111F",
+    backgroundColor: badgeColors.bg,
   },
   safeArea: {
     flex: 1,
-    paddingBottom: 18,
   },
-  header: {
-    paddingHorizontal: 22,
-    paddingTop: 10,
+  homeShell: {
+    flex: 1,
+    width: "100%",
+    alignSelf: "center",
+    paddingBottom: 12,
+  },
+  appBar: {
+    minHeight: 58,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 16,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 6,
   },
-  eyebrow: {
-    color: "#2DD4BF",
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.5,
+  titleCluster: {
+    flex: 1,
+    minWidth: 0,
+  },
+  appEyebrow: {
+    color: badgeColors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
     textTransform: "uppercase",
   },
-  title: {
-    color: "#F8FAFC",
-    fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: -1.2,
-    marginTop: 4,
-  },
-  subtitle: {
-    color: "#94A3B8",
-    fontSize: 14,
-    lineHeight: 20,
-    maxWidth: 260,
-    marginTop: 4,
-    fontWeight: "600",
-  },
-  headerActions: {
-    alignItems: "flex-end",
-    gap: 10,
-  },
-  topButtonRow: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
-  settingsButton: {
-    borderRadius: 999,
-    backgroundColor: "#17243A",
-    borderWidth: 1,
-    borderColor: "#26364F",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  settingsButtonText: {
-    color: "#CBD5E1",
-    fontSize: 13,
+  appTitle: {
+    color: badgeColors.text,
+    fontSize: 24,
     fontWeight: "900",
   },
-  addButton: {
-    borderRadius: 999,
-    backgroundColor: "#2DD4BF",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  addButtonText: {
-    color: "#04111F",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  statsPill: {
-    minWidth: 70,
-    borderRadius: 22,
-    backgroundColor: "#101C2E",
-    borderWidth: 1,
-    borderColor: "#26364F",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  statsNumber: {
-    color: "#F8FAFC",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  statsLabel: {
-    color: "#94A3B8",
+  appMeta: {
+    color: badgeColors.textMuted,
     fontSize: 11,
     fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
+    marginTop: 1,
+  },
+  appActions: {
+    flexDirection: "row",
+    gap: 10,
   },
   controlsRow: {
     flexDirection: "row",
     gap: 8,
-    paddingHorizontal: 22,
-    paddingTop: 18,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     flexWrap: "wrap",
   },
   toggleButton: {
@@ -540,10 +597,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "stretch",
-    marginTop: 2,
+    minHeight: 360,
+    paddingTop: 4,
+  },
+  compactReelWrapper: {
+    minHeight: 300,
   },
   inlineNotice: {
-    marginHorizontal: 22,
+    marginHorizontal: 16,
     marginTop: 10,
     borderRadius: 18,
     borderWidth: 1,
@@ -597,42 +658,6 @@ const styles = StyleSheet.create({
     color: "#04111F",
     fontSize: 13,
     fontWeight: "900",
-  },
-  footerPanel: {
-    marginHorizontal: 22,
-    borderRadius: 24,
-    backgroundColor: "#101C2EE6",
-    borderWidth: 1,
-    borderColor: "#26364F",
-    padding: 16,
-  },
-  footerTitle: {
-    color: "#F8FAFC",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  footerText: {
-    color: "#94A3B8",
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 5,
-    fontWeight: "600",
-  },
-  footerStatsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 12,
-    flexWrap: "wrap",
-  },
-  footerStat: {
-    overflow: "hidden",
-    borderRadius: 999,
-    backgroundColor: "#17243A",
-    color: "#CBD5E1",
-    fontSize: 11,
-    fontWeight: "800",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
   pressed: {
     opacity: 0.78,

@@ -1,1 +1,1 @@
-export { deleteDatabaseForDev, getDatabase } from './database.native';
+export { getDatabase } from "./database.native";

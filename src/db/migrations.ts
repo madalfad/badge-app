@@ -1,11 +1,21 @@
-import type { AppDatabase } from './types';
+import {
+  DEFAULT_REEL_COLOR,
+  DEFAULT_REEL_ICON,
+  DEFAULT_REEL_ID,
+  DEFAULT_REEL_NAME,
+} from "@/features/reels/constants";
+import { nowIso } from "@/utils/dates";
 
-const DATABASE_VERSION = 1;
+import type { AppDatabase } from "./types";
+
+const DATABASE_VERSION = 2;
 
 export async function migrateDbIfNeeded(db: AppDatabase) {
-  await db.execAsync('PRAGMA foreign_keys = ON');
+  await db.execAsync("PRAGMA foreign_keys = ON");
 
-  const versionRow = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const versionRow = await db.getFirstAsync<{ user_version: number }>(
+    "PRAGMA user_version",
+  );
   const currentVersion = versionRow?.user_version ?? 0;
 
   if (currentVersion >= DATABASE_VERSION) {
@@ -96,5 +106,73 @@ CREATE INDEX IF NOT EXISTS idx_card_tags_tag_id ON card_tags(tag_id);
 `);
   }
 
+  if (currentVersion < 2) {
+    await createReelTables(db);
+    await ensureDefaultReel(db);
+    await backfillDefaultReel(db);
+  }
+
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
+}
+
+async function createReelTables(db: AppDatabase) {
+  await db.execAsync(`
+CREATE TABLE IF NOT EXISTS reels (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  color TEXT,
+  icon TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS reel_cards (
+  reel_id TEXT NOT NULL,
+  card_id TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT NOT NULL,
+  PRIMARY KEY (reel_id, card_id),
+  FOREIGN KEY (reel_id) REFERENCES reels(id) ON DELETE CASCADE,
+  FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_reels_sort_order ON reels(sort_order);
+CREATE INDEX IF NOT EXISTS idx_reel_cards_card_id ON reel_cards(card_id);
+CREATE INDEX IF NOT EXISTS idx_reel_cards_order ON reel_cards(reel_id, sort_order);
+`);
+}
+
+async function ensureDefaultReel(db: AppDatabase) {
+  const now = nowIso();
+  await db.runAsync(
+    `INSERT OR IGNORE INTO reels (
+       id,
+       name,
+       color,
+       icon,
+       sort_order,
+       is_archived,
+       created_at,
+       updated_at
+     ) VALUES (?, ?, ?, ?, 0, 0, ?, ?)`,
+    DEFAULT_REEL_ID,
+    DEFAULT_REEL_NAME,
+    DEFAULT_REEL_COLOR,
+    DEFAULT_REEL_ICON,
+    now,
+    now,
+  );
+}
+
+async function backfillDefaultReel(db: AppDatabase) {
+  await db.runAsync(
+    `INSERT OR IGNORE INTO reel_cards (reel_id, card_id, sort_order, added_at)
+     SELECT ?, cards.id, cards.sort_order, ?
+     FROM cards
+     WHERE cards.is_archived = 0`,
+    DEFAULT_REEL_ID,
+    nowIso(),
+  );
 }

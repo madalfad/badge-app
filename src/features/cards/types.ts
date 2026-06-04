@@ -23,23 +23,6 @@ export type BadgeCard = {
   tags?: string[];
 };
 
-export type CardRecord = {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  categoryId: string | null;
-  primaryColor: string | null;
-  sortOrder: number;
-  isFavorite: boolean;
-  isArchived: boolean;
-  reviewDate: string | null;
-  sourceType: string;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-  lastViewedAt: string | null;
-};
-
 export type CardAssetRecord = {
   id: string;
   cardId: string;

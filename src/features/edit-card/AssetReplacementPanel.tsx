@@ -39,106 +39,213 @@ export function AssetReplacementPanel({
   onSaveReplacement,
   onRemove,
 }: AssetReplacementPanelProps) {
-  const label = side === "front" ? "Front side" : "Back side";
   const isRequired = side === "front";
-  const previewUri =
+  const previewUri = getPreviewUri(asset, pendingImage);
+  const dimensions = getImageDimensions(asset, pendingImage);
+
+  return (
+    <View style={styles.panel}>
+      <AssetPanelHeader
+        label={side === "front" ? "Front side" : "Back side"}
+        subtitle={getPanelSubtitle(asset, pendingImage, isRequired)}
+        dimensions={dimensions}
+        isRequired={isRequired}
+      />
+      <AssetPreview pendingImage={pendingImage} previewUri={previewUri} />
+      <AssetActions
+        asset={asset}
+        isRequired={isRequired}
+        isSaving={isSaving}
+        pendingImage={pendingImage}
+        onCamera={onCamera}
+        onDiscardPending={onDiscardPending}
+        onLibrary={onLibrary}
+        onRemove={onRemove}
+        onRotate={onRotate}
+        onSaveReplacement={onSaveReplacement}
+      />
+    </View>
+  );
+}
+
+function getPreviewUri(
+  asset: CardAssetRecord | null,
+  pendingImage: PendingCardImage | null,
+) {
+  return (
     pendingImage?.previewUri ??
     asset?.displayUri ??
     asset?.thumbnailUri ??
     asset?.fileUri ??
-    null;
-  const dimensions = pendingImage
-    ? `${pendingImage.width} × ${pendingImage.height}`
-    : asset
-      ? `${asset.width} × ${asset.height}`
-      : null;
+    null
+  );
+}
+
+function getImageDimensions(
+  asset: CardAssetRecord | null,
+  pendingImage: PendingCardImage | null,
+) {
+  if (pendingImage) {
+    return `${pendingImage.width} × ${pendingImage.height}`;
+  }
+
+  if (asset) {
+    return `${asset.width} × ${asset.height}`;
+  }
+
+  return null;
+}
+
+function getPanelSubtitle(
+  asset: CardAssetRecord | null,
+  pendingImage: PendingCardImage | null,
+  isRequired: boolean,
+) {
+  if (pendingImage) {
+    return "Pending replacement";
+  }
+
+  if (asset) {
+    return "Current saved image";
+  }
+
+  return isRequired ? "Required for viewer" : "Optional back side";
+}
+
+type AssetPanelHeaderProps = {
+  label: string;
+  subtitle: string;
+  dimensions: string | null;
+  isRequired: boolean;
+};
+
+function AssetPanelHeader({
+  label,
+  subtitle,
+  dimensions,
+  isRequired,
+}: AssetPanelHeaderProps) {
+  return (
+    <View style={styles.headerRow}>
+      <View>
+        <Text style={styles.panelTitle}>
+          {label}
+          {isRequired ? " *" : ""}
+        </Text>
+        <Text style={styles.panelSubtitle}>{subtitle}</Text>
+      </View>
+      {dimensions ? <Text style={styles.imageMeta}>{dimensions}</Text> : null}
+    </View>
+  );
+}
+
+type AssetPreviewProps = {
+  previewUri: string | null;
+  pendingImage: PendingCardImage | null;
+};
+
+function AssetPreview({ previewUri, pendingImage }: AssetPreviewProps) {
+  if (!previewUri) {
+    return (
+      <View style={styles.emptyPreview}>
+        <Text style={styles.emptyPreviewTitle}>No image saved</Text>
+        <Text style={styles.emptyPreviewText}>
+          Add an image from the camera or photo library.
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.panel}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.panelTitle}>
-            {label}
-            {isRequired ? " *" : ""}
-          </Text>
-          <Text style={styles.panelSubtitle}>
-            {pendingImage
-              ? "Pending replacement"
-              : asset
-                ? "Current saved image"
-                : isRequired
-                  ? "Required for viewer"
-                  : "Optional back side"}
-          </Text>
-        </View>
-        {dimensions ? <Text style={styles.imageMeta}>{dimensions}</Text> : null}
-      </View>
-
-      {previewUri ? (
-        <View
-          style={[
-            styles.previewFrame,
-            pendingImage && styles.pendingPreviewFrame,
-          ]}
-        >
-          <Image
-            source={{ uri: previewUri }}
-            contentFit="contain"
-            recyclingKey={`${previewUri}-${pendingImage?.rotateDegrees ?? 0}`}
-            style={[
-              styles.previewImage,
-              {
-                transform: [
-                  { rotate: `${pendingImage?.rotateDegrees ?? 0}deg` },
-                ],
-              },
-            ]}
-          />
-        </View>
-      ) : (
-        <View style={styles.emptyPreview}>
-          <Text style={styles.emptyPreviewTitle}>No image saved</Text>
-          <Text style={styles.emptyPreviewText}>
-            Add an image from the camera or photo library.
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.actionsRow}>
-        <PanelButton label="Camera" onPress={onCamera} disabled={isSaving} />
-        <PanelButton label="Photos" onPress={onLibrary} disabled={isSaving} />
-        <PanelButton
-          label="Rotate"
-          onPress={onRotate}
-          disabled={!pendingImage || isSaving}
-        />
-        {pendingImage ? (
-          <>
-            <PanelButton
-              label={isSaving ? "Saving…" : "Save image"}
-              onPress={onSaveReplacement}
-              disabled={isSaving}
-              primary
-              loading={isSaving}
-            />
-            <PanelButton
-              label="Discard"
-              onPress={onDiscardPending}
-              disabled={isSaving}
-              danger
-            />
-          </>
-        ) : null}
-        {!pendingImage && !isRequired && asset && onRemove ? (
-          <PanelButton
-            label="Remove back"
-            onPress={onRemove}
-            disabled={isSaving}
-            danger
-          />
-        ) : null}
-      </View>
+    <View
+      style={[styles.previewFrame, pendingImage && styles.pendingPreviewFrame]}
+    >
+      <Image
+        source={{ uri: previewUri }}
+        contentFit="contain"
+        recyclingKey={`${previewUri}-${pendingImage?.rotateDegrees ?? 0}`}
+        style={[
+          styles.previewImage,
+          {
+            transform: [{ rotate: `${pendingImage?.rotateDegrees ?? 0}deg` }],
+          },
+        ]}
+      />
     </View>
+  );
+}
+
+type AssetActionsProps = Omit<AssetReplacementPanelProps, "side"> & {
+  isRequired: boolean;
+};
+
+function AssetActions({
+  asset,
+  pendingImage,
+  isRequired,
+  isSaving,
+  onCamera,
+  onLibrary,
+  onRotate,
+  onDiscardPending,
+  onSaveReplacement,
+  onRemove,
+}: AssetActionsProps) {
+  return (
+    <View style={styles.actionsRow}>
+      <PanelButton label="Camera" onPress={onCamera} disabled={isSaving} />
+      <PanelButton label="Photos" onPress={onLibrary} disabled={isSaving} />
+      <PanelButton
+        label="Rotate"
+        onPress={onRotate}
+        disabled={!pendingImage || isSaving}
+      />
+      {pendingImage ? (
+        <PendingImageActions
+          isSaving={isSaving}
+          onDiscardPending={onDiscardPending}
+          onSaveReplacement={onSaveReplacement}
+        />
+      ) : null}
+      {!pendingImage && !isRequired && asset && onRemove ? (
+        <PanelButton
+          label="Remove back"
+          onPress={onRemove}
+          disabled={isSaving}
+          danger
+        />
+      ) : null}
+    </View>
+  );
+}
+
+type PendingImageActionsProps = {
+  isSaving: boolean;
+  onDiscardPending: () => void;
+  onSaveReplacement: () => void;
+};
+
+function PendingImageActions({
+  isSaving,
+  onDiscardPending,
+  onSaveReplacement,
+}: PendingImageActionsProps) {
+  return (
+    <>
+      <PanelButton
+        label={isSaving ? "Saving…" : "Save image"}
+        onPress={onSaveReplacement}
+        disabled={isSaving}
+        primary
+        loading={isSaving}
+      />
+      <PanelButton
+        label="Discard"
+        onPress={onDiscardPending}
+        disabled={isSaving}
+        danger
+      />
+    </>
   );
 }
 

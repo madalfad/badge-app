@@ -1,8 +1,8 @@
-import type { CategoryRecord } from '@/features/cards/types';
-import { nowIso } from '@/utils/dates';
-import { createId } from '@/utils/ids';
+import type { CategoryRecord } from "@/features/cards/types";
+import { nowIso } from "@/utils/dates";
+import { createId } from "@/utils/ids";
 
-import type { AppDatabase } from '../types';
+import type { AppDatabase } from "../types";
 
 type CategoryRow = {
   id: string;
@@ -26,23 +26,25 @@ function mapCategory(row: CategoryRow): CategoryRecord {
   };
 }
 
-export async function listCategories(db: AppDatabase) {
-  const rows = await db.getAllAsync<CategoryRow>(
-    'SELECT * FROM categories ORDER BY sort_order ASC, name COLLATE NOCASE ASC',
+async function getCategoryByName(db: AppDatabase, name: string) {
+  const row = await db.getFirstAsync<CategoryRow>(
+    "SELECT * FROM categories WHERE name = ?",
+    name,
   );
-  return rows.map(mapCategory);
-}
-
-export async function getCategoryByName(db: AppDatabase, name: string) {
-  const row = await db.getFirstAsync<CategoryRow>('SELECT * FROM categories WHERE name = ?', name);
   return row ? mapCategory(row) : null;
 }
 
 export async function upsertCategory(
   db: AppDatabase,
-  input: { id?: string; name: string; color?: string | null; icon?: string | null; sortOrder?: number },
+  input: {
+    id?: string;
+    name: string;
+    color?: string | null;
+    icon?: string | null;
+    sortOrder?: number;
+  },
 ) {
-  const id = input.id ?? createId('cat');
+  const id = input.id ?? createId("cat");
   const now = nowIso();
 
   await db.runAsync(
@@ -67,8 +69,4 @@ export async function upsertCategory(
     throw new Error(`Failed to upsert category: ${input.name}`);
   }
   return category;
-}
-
-export async function deleteCategory(db: AppDatabase, id: string) {
-  await db.runAsync('DELETE FROM categories WHERE id = ?', id);
 }

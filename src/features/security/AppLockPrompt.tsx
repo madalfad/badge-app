@@ -1,20 +1,16 @@
-import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useState } from "react";
+import { StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppLockRecoveryNotice } from "./AppLockRecoveryNotice";
 import {
-  authenticateWithDevice,
-  getDeviceAuthAvailability,
-  type DeviceAuthAvailability,
-} from "./appLockStore";
+  BadgeButton,
+  BadgePanel,
+  BadgeScrollScreen,
+  BadgeTextField,
+} from "@/components/badge-ui";
+import { AppLockRecoveryNotice } from "./AppLockRecoveryNotice";
+import { authenticateWithDevice } from "./appLockStore";
+import { useDeviceAuthAvailability } from "./useDeviceAuthAvailability";
 
 type AppLockPromptProps = {
   storedPin: string;
@@ -25,33 +21,7 @@ export function AppLockPrompt({ storedPin, onUnlock }: AppLockPromptProps) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isCheckingDevice, setIsCheckingDevice] = useState(false);
-  const [deviceAuth, setDeviceAuth] = useState<DeviceAuthAvailability | null>(
-    null,
-  );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getDeviceAuthAvailability()
-      .then((availability) => {
-        if (isMounted) {
-          setDeviceAuth(availability);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setDeviceAuth({
-            isAvailable: false,
-            label: "Device unlock",
-            detail: "Device authentication is unavailable right now.",
-          });
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const deviceAuth = useDeviceAuthAvailability();
 
   const handleUnlock = () => {
     if (pin === storedPin) {
@@ -88,7 +58,7 @@ export function AppLockPrompt({ storedPin, onUnlock }: AppLockPromptProps) {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-      <View style={styles.content}>
+      <BadgeScrollScreen contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>App lock</Text>
         <Text style={styles.title}>Unlock BadgeDeck</Text>
         <Text style={styles.subtitle}>
@@ -97,9 +67,9 @@ export function AppLockPrompt({ storedPin, onUnlock }: AppLockPromptProps) {
           governance.
         </Text>
 
-        <View style={styles.card}>
+        <BadgePanel style={styles.card}>
           <Text style={styles.inputLabel}>PIN</Text>
-          <TextInput
+          <BadgeTextField
             value={pin}
             autoFocus
             keyboardType="number-pad"
@@ -115,37 +85,22 @@ export function AppLockPrompt({ storedPin, onUnlock }: AppLockPromptProps) {
             style={styles.input}
           />
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          <Pressable
-            accessibilityRole="button"
+          <BadgeButton
             disabled={pin.length === 0}
+            label="Unlock"
             onPress={handleUnlock}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pin.length === 0 && styles.disabledButton,
-              pressed && pin.length > 0 && styles.pressed,
-            ]}
-          >
-            <Text style={styles.primaryButtonText}>Unlock</Text>
-          </Pressable>
+            style={styles.primaryButton}
+            variant="primary"
+          />
 
           {deviceAuth?.isAvailable ? (
-            <Pressable
-              accessibilityRole="button"
+            <BadgeButton
               disabled={isCheckingDevice}
+              label={`Use ${deviceAuth.label}`}
+              loading={isCheckingDevice}
               onPress={handleDeviceUnlock}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && !isCheckingDevice && styles.pressed,
-              ]}
-            >
-              {isCheckingDevice ? (
-                <ActivityIndicator color="#F8FAFC" />
-              ) : (
-                <Text style={styles.secondaryButtonText}>
-                  Use {deviceAuth.label}
-                </Text>
-              )}
-            </Pressable>
+              style={styles.secondaryButton}
+            />
           ) : (
             <Text style={styles.deviceHint}>
               {deviceAuth?.detail ?? "Checking device unlock support…"}
@@ -153,8 +108,8 @@ export function AppLockPrompt({ storedPin, onUnlock }: AppLockPromptProps) {
           )}
 
           <AppLockRecoveryNotice compact />
-        </View>
-      </View>
+        </BadgePanel>
+      </BadgeScrollScreen>
     </SafeAreaView>
   );
 }
@@ -165,9 +120,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#07111F",
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
-    padding: 24,
     gap: 10,
   },
   eyebrow: {
@@ -182,7 +136,6 @@ const styles = StyleSheet.create({
     fontSize: 34,
     lineHeight: 39,
     fontWeight: "900",
-    letterSpacing: -1,
   },
   subtitle: {
     color: "#94A3B8",
@@ -193,11 +146,6 @@ const styles = StyleSheet.create({
   },
   card: {
     marginTop: 12,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: "#26364F",
-    backgroundColor: "#101C2E",
-    padding: 16,
     gap: 12,
   },
   inputLabel: {
@@ -209,14 +157,8 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 52,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#26364F",
-    backgroundColor: "#07111F",
-    color: "#F8FAFC",
     fontSize: 20,
     fontWeight: "900",
-    paddingHorizontal: 14,
     letterSpacing: 4,
   },
   errorText: {
@@ -226,40 +168,14 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     minHeight: 50,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#2DD4BF",
-  },
-  primaryButtonText: {
-    color: "#04111F",
-    fontSize: 14,
-    fontWeight: "900",
   },
   secondaryButton: {
     minHeight: 50,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#26364F",
-    backgroundColor: "#17243A",
-  },
-  secondaryButtonText: {
-    color: "#F8FAFC",
-    fontSize: 14,
-    fontWeight: "900",
   },
   deviceHint: {
     color: "#94A3B8",
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "700",
-  },
-  disabledButton: {
-    opacity: 0.45,
-  },
-  pressed: {
-    opacity: 0.78,
   },
 });

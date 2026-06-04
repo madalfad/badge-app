@@ -7,15 +7,15 @@ import {
   archiveCard,
   createCard,
   deleteCard,
-  markViewed,
   toggleFavorite,
   updateCard,
 } from "@/db/repositories/cardsRepository";
 import { upsertCategory } from "@/db/repositories/categoriesRepository";
+import { setCardReels } from "@/db/repositories/reelsRepository";
 import { setTagsForCard } from "@/db/repositories/tagsRepository";
 import type { AppDatabase } from "@/db/types";
 import { withWriteTransaction } from "@/db/types";
-import type { CreateCardInput, UpdateCardInput } from "@/features/cards/types";
+
 import {
   deleteCardDirectory,
   deleteStoredCardAssetFiles,
@@ -39,6 +39,7 @@ type CreateCardFromImagesInput = {
   primaryColor?: string | null;
   frontImage: SourceCardImage;
   backImage?: SourceCardImage | null;
+  reelIds?: string[];
 };
 
 type UpdateCardMetadataInput = {
@@ -48,6 +49,7 @@ type UpdateCardMetadataInput = {
   tags?: string[];
   isFavorite?: boolean;
   primaryColor?: string | null;
+  reelIds?: string[];
 };
 
 type NextSortOrderRow = {
@@ -83,15 +85,6 @@ function toAssetUpsertInput(
     fileSize: asset.fileSize,
     cropDataJson: asset.cropDataJson,
   };
-}
-
-export async function createCardRecord(
-  db: AppDatabase,
-  input: CreateCardInput,
-) {
-  const cardId = await createCard(db, input);
-  ensureCardDirectory(cardId);
-  return cardId;
 }
 
 export async function createCardFromImages(
@@ -139,6 +132,8 @@ export async function createCardFromImages(
       if (input.tags) {
         await setTagsForCard(txn, cardId, input.tags);
       }
+
+      await setCardReels(txn, cardId, input.reelIds ?? []);
     });
 
     return cardId;
@@ -146,14 +141,6 @@ export async function createCardFromImages(
     cleanupFailedImport(cardId);
     throw error;
   }
-}
-
-export async function updateCardRecord(
-  db: AppDatabase,
-  cardId: string,
-  patch: UpdateCardInput,
-) {
-  await updateCard(db, cardId, patch);
 }
 
 export async function updateCardMetadata(
@@ -184,6 +171,10 @@ export async function updateCardMetadata(
     });
 
     await setTagsForCard(txn, cardId, input.tags ?? []);
+
+    if (input.reelIds) {
+      await setCardReels(txn, cardId, input.reelIds);
+    }
   });
 }
 
@@ -271,8 +262,4 @@ export async function deleteCardRecordAndFiles(
 
 export async function toggleCardFavorite(db: AppDatabase, cardId: string) {
   await toggleFavorite(db, cardId);
-}
-
-export async function markCardAsViewed(db: AppDatabase, cardId: string) {
-  await markViewed(db, cardId);
 }

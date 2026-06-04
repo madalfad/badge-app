@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,15 +13,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
+import {
+  BadgeButton,
+  BadgeTopBar,
+  useBadgeLayout,
+} from "@/components/badge-ui";
 import { AppLockRecoveryNotice } from "@/features/security/AppLockRecoveryNotice";
+import { useDeviceAuthAvailability } from "@/features/security/useDeviceAuthAvailability";
 
 import { useBooleanSetting } from "./useBooleanSetting";
 import { useStringSetting } from "./useStringSetting";
 import {
   clearStoredAppLockPin,
-  getDeviceAuthAvailability,
   setStoredAppLockPin,
-  type DeviceAuthAvailability,
 } from "@/features/security/appLockStore";
 
 const TIMEOUT_OPTIONS = [
@@ -33,6 +36,7 @@ const TIMEOUT_OPTIONS = [
 
 export function SettingsScreen() {
   const router = useRouter();
+  const layout = useBadgeLayout();
   const [privacyAccepted, setPrivacyAccepted] = useBooleanSetting(
     "privacy_notice_accepted",
     false,
@@ -57,38 +61,12 @@ export function SettingsScreen() {
   const [confirmPin, setConfirmPin] = useState("");
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [isSavingLock, setIsSavingLock] = useState(false);
-  const [deviceAuth, setDeviceAuth] = useState<DeviceAuthAvailability | null>(
-    null,
-  );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getDeviceAuthAvailability()
-      .then((availability) => {
-        if (isMounted) {
-          setDeviceAuth(availability);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setDeviceAuth({
-            isAvailable: false,
-            label: "Device unlock",
-            detail: "Device authentication is unavailable right now.",
-          });
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const deviceAuth = useDeviceAuthAvailability();
 
   const enableAppLock = async () => {
     setSecurityError(null);
 
-    if (Platform.OS === "web") {
+    if (process.env.EXPO_OS === "web") {
       setSecurityError(
         "App lock secure storage is available in native builds.",
       );
@@ -155,25 +133,41 @@ export function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={styles.headerButton}
-        >
-          <Text style={styles.headerButtonText}>Back</Text>
-        </Pressable>
-        <View style={styles.headerTitleBlock}>
-          <Text style={styles.eyebrow}>Settings</Text>
-          <Text style={styles.headerTitle}>Security & polish</Text>
-        </View>
-        <View style={styles.headerSpacer} />
-      </View>
+      <BadgeTopBar
+        eyebrow="Settings"
+        title="Security & polish"
+        left={
+          <BadgeButton
+            label="Back"
+            onPress={() => router.back()}
+            style={styles.headerButton}
+            variant="ghost"
+          />
+        }
+        right={<View style={styles.headerSpacer} />}
+        style={[
+          styles.header,
+          {
+            alignSelf: "center",
+            maxWidth: layout.contentMaxWidth,
+            width: "100%",
+          },
+        ]}
+      />
 
       <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          {
+            alignSelf: "center",
+            maxWidth: layout.contentMaxWidth,
+            paddingHorizontal: layout.gutter,
+            width: "100%",
+          },
+        ]}
       >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Privacy notice</Text>

@@ -172,7 +172,8 @@ export function BadgeReel({
   const [activeIndex, setActiveIndex] = useState(initialIndex);
 
   const dimensions = useMemo(() => {
-    const cardWidth = Math.min(width - 54, 350);
+    const stageWidth = Math.min(width, 430);
+    const cardWidth = Math.min(stageWidth - 54, 350);
     const cardHeight = Math.min(cardWidth * 1.45, height * 0.57);
     const stageHeight = Math.min(
       Math.max(cardHeight + 190, 520),
@@ -182,7 +183,7 @@ export function BadgeReel({
       cardWidth,
       cardHeight,
       itemSpacing: cardHeight * 0.39,
-      stageWidth: width,
+      stageWidth,
       stageHeight,
     };
   }, [height, width]);
@@ -335,7 +336,7 @@ export function BadgeReel({
 const styles = StyleSheet.create({
   stage: {
     overflow: "visible",
-    alignSelf: "stretch",
+    alignSelf: "center",
   },
   gestureSurface: {
     flex: 1,

@@ -1,19 +1,19 @@
 import { useState } from "react";
-import { Dimensions, StyleSheet } from "react-native";
+import { StyleSheet, useWindowDimensions } from "react-native";
 import Animated, { Easing, Keyframe } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-const INITIAL_SCALE_FACTOR = Dimensions.get("screen").height / 90;
 const DURATION = 600;
 
 export function AnimatedSplashOverlay() {
   const [visible, setVisible] = useState(true);
+  const { height } = useWindowDimensions();
 
   if (!visible) return null;
 
   const splashKeyframe = new Keyframe({
     0: {
-      transform: [{ scale: INITIAL_SCALE_FACTOR }],
+      transform: [{ scale: height / 90 }],
       opacity: 1,
     },
     20: {

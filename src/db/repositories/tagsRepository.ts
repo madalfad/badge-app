@@ -1,7 +1,7 @@
-import { nowIso } from '@/utils/dates';
-import { createId } from '@/utils/ids';
+import { nowIso } from "@/utils/dates";
+import { createId } from "@/utils/ids";
 
-import type { AppDatabase } from '../types';
+import type { AppDatabase } from "../types";
 
 type TagRow = {
   id: string;
@@ -9,12 +9,8 @@ type TagRow = {
   created_at: string;
 };
 
-export async function listTags(db: AppDatabase) {
-  return db.getAllAsync<TagRow>('SELECT * FROM tags ORDER BY name COLLATE NOCASE ASC');
-}
-
 async function upsertTag(db: AppDatabase, name: string) {
-  const id = createId('tag');
+  const id = createId("tag");
   const now = nowIso();
   await db.runAsync(
     `INSERT INTO tags (id, name, created_at)
@@ -25,24 +21,33 @@ async function upsertTag(db: AppDatabase, name: string) {
     now,
   );
 
-  const row = await db.getFirstAsync<TagRow>('SELECT * FROM tags WHERE name = ?', name);
+  const row = await db.getFirstAsync<TagRow>(
+    "SELECT * FROM tags WHERE name = ?",
+    name,
+  );
   if (!row) {
     throw new Error(`Failed to upsert tag: ${name}`);
   }
   return row;
 }
 
-export async function setTagsForCard(db: AppDatabase, cardId: string, tagNames: string[]) {
-  await db.runAsync('DELETE FROM card_tags WHERE card_id = ?', cardId);
+export async function setTagsForCard(
+  db: AppDatabase,
+  cardId: string,
+  tagNames: string[],
+) {
+  await db.runAsync("DELETE FROM card_tags WHERE card_id = ?", cardId);
 
   const uniqueTagNames = Array.from(
-    new Set(tagNames.map((name) => name.trim()).filter((name) => name.length > 0)),
+    new Set(
+      tagNames.map((name) => name.trim()).filter((name) => name.length > 0),
+    ),
   );
 
   for (const tagName of uniqueTagNames) {
     const tag = await upsertTag(db, tagName);
     await db.runAsync(
-      'INSERT OR IGNORE INTO card_tags (card_id, tag_id) VALUES (?, ?)',
+      "INSERT OR IGNORE INTO card_tags (card_id, tag_id) VALUES (?, ?)",
       cardId,
       tag.id,
     );

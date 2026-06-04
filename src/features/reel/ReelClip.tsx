@@ -37,11 +37,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#FFFFFF99',
-    shadowColor: '#000000',
-    shadowOpacity: 0.3,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
+    boxShadow: '0 8px 18px rgba(0, 0, 0, 0.3)',
   },
   reelInner: {
     width: 27,

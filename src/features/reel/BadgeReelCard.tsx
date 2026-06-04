@@ -196,11 +196,7 @@ const styles = StyleSheet.create({
     padding: 22,
     borderWidth: 1,
     borderColor: "#FFFFFF",
-    shadowColor: "#000000",
-    shadowOpacity: 0.22,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 18 },
-    elevation: 12,
+    boxShadow: "0 18px 22px rgba(0, 0, 0, 0.22)",
   },
   imageCard: {
     backgroundColor: "#020817",
@@ -260,7 +256,6 @@ const styles = StyleSheet.create({
     color: "#F8FAFC",
     fontSize: 22,
     fontWeight: "900",
-    letterSpacing: -0.4,
   },
   imageSubtitle: {
     color: "#CBD5E1",
@@ -270,10 +265,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   focusedCard: {
-    shadowOpacity: 0.34,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 24 },
-    elevation: 18,
+    boxShadow: "0 24px 30px rgba(0, 0, 0, 0.34)",
   },
   accentRail: {
     position: "absolute",
@@ -318,7 +310,6 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontSize: 27,
     fontWeight: "900",
-    letterSpacing: -0.7,
   },
   subtitle: {
     marginTop: 6,
