@@ -13,6 +13,13 @@
         "buildType": "apk"
       }
     },
+    "field-test": {
+      "distribution": "internal",
+      "developmentClient": false,
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {}
   }
 }
