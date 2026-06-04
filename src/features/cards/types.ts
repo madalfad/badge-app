@@ -12,6 +12,7 @@ export type BadgeCard = {
   code: string;
   sections: BadgeCardSection[];
   footer: string;
+  sourceType?: string;
   isFavorite: boolean;
   isArchived?: boolean;
   lastViewedAt?: string | null;

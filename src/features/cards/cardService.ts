@@ -29,6 +29,7 @@ import {
   type SourceCardImage,
 } from "@/storage/imagePipeline";
 import { createId } from "@/utils/ids";
+import type { BadgeCardSection } from "./types";
 
 type CreateCardFromImagesInput = {
   title: string;
@@ -39,6 +40,19 @@ type CreateCardFromImagesInput = {
   primaryColor?: string | null;
   frontImage: SourceCardImage;
   backImage?: SourceCardImage | null;
+  reelIds?: string[];
+};
+
+type CreateCardFromTextInput = {
+  title: string;
+  subtitle?: string | null;
+  categoryName?: string | null;
+  tags?: string[];
+  isFavorite?: boolean;
+  primaryColor?: string | null;
+  code?: string | null;
+  sections: BadgeCardSection[];
+  footer?: string | null;
   reelIds?: string[];
 };
 
@@ -141,6 +155,65 @@ export async function createCardFromImages(
     cleanupFailedImport(cardId);
     throw error;
   }
+}
+
+export async function createCardFromText(
+  db: AppDatabase,
+  input: CreateCardFromTextInput,
+) {
+  const title = input.title.trim();
+  if (!title) {
+    throw new Error("A card title is required.");
+  }
+
+  const sections = input.sections
+    .map((section) => ({
+      label: section.label.trim(),
+      value: section.value.trim(),
+    }))
+    .filter((section) => section.label && section.value);
+
+  if (sections.length === 0) {
+    throw new Error("Add at least one text row before saving.");
+  }
+
+  const cardId = createId("card");
+
+  await withWriteTransaction(db, async (txn) => {
+    const categoryName = input.categoryName?.trim() ?? "";
+    const category = categoryName
+      ? await upsertCategory(txn, {
+          name: categoryName,
+          color: input.primaryColor ?? DEFAULT_ACCENT,
+        })
+      : null;
+    const sortOrder = await getNextSortOrder(txn);
+
+    await createCard(txn, {
+      id: cardId,
+      title,
+      subtitle: input.subtitle?.trim() || null,
+      categoryId: category?.id ?? null,
+      primaryColor: input.primaryColor ?? category?.color ?? DEFAULT_ACCENT,
+      sortOrder,
+      isFavorite: input.isFavorite ?? false,
+      sourceType: "user_text",
+      notes: JSON.stringify({
+        code: input.code?.trim() || "TEXT",
+        sections,
+        footer:
+          input.footer?.trim() || "Reference only • verify local protocol",
+      }),
+    });
+
+    if (input.tags) {
+      await setTagsForCard(txn, cardId, input.tags);
+    }
+
+    await setCardReels(txn, cardId, input.reelIds ?? []);
+  });
+
+  return cardId;
 }
 
 export async function updateCardMetadata(

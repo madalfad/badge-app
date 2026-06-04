@@ -58,6 +58,10 @@ function BadgeReelCardComponent({
   const imageUri =
     card.frontThumbnailUri ?? card.frontDisplayUri ?? card.frontFileUri;
   const showImageMeta = height >= 230 && width >= 230;
+  const sectionCount = card.sections.length;
+  const compactText = !imageUri && (height < 430 || sectionCount > 4);
+  const denseText = !imageUri && (height < 390 || sectionCount > 6);
+  const sectionValueLines = denseText ? 1 : 2;
 
   return (
     <Pressable
@@ -125,7 +129,14 @@ function BadgeReelCardComponent({
           ) : null}
         </View>
       ) : (
-        <View style={[styles.card, focused && styles.focusedCard]}>
+        <View
+          style={[
+            styles.card,
+            compactText && styles.compactTextCard,
+            denseText && styles.denseTextCard,
+            focused && styles.focusedCard,
+          ]}
+        >
           <View
             style={[styles.accentRail, { backgroundColor: card.accentColor }]}
           />
@@ -144,30 +155,54 @@ function BadgeReelCardComponent({
             <Text style={styles.codeText}>{card.code}</Text>
           </View>
 
-          <Text numberOfLines={2} style={styles.title}>
+          <Text
+            adjustsFontSizeToFit
+            minimumFontScale={0.86}
+            numberOfLines={denseText ? 1 : 2}
+            style={[styles.title, compactText && styles.compactTitle]}
+          >
             {card.title}
           </Text>
-          <Text numberOfLines={2} style={styles.subtitle}>
+          <Text
+            numberOfLines={denseText ? 1 : 2}
+            style={[styles.subtitle, compactText && styles.compactSubtitle]}
+          >
             {card.subtitle}
           </Text>
 
-          <View style={styles.divider} />
+          <View style={[styles.divider, compactText && styles.compactDivider]} />
 
-          <View style={styles.sections}>
-            {card.sections.map((section) => (
-              <View key={section.label} style={styles.sectionRow}>
+          <View style={[styles.sections, compactText && styles.compactSections]}>
+            {card.sections.map((section, index) => (
+              <View
+                key={`${section.label}-${index}`}
+                style={[
+                  styles.sectionRow,
+                  compactText && styles.compactSectionRow,
+                ]}
+              >
                 <Text numberOfLines={1} style={styles.sectionLabel}>
                   {section.label}
                 </Text>
-                <Text numberOfLines={1} style={styles.sectionValue}>
+                <Text
+                  adjustsFontSizeToFit={denseText}
+                  minimumFontScale={0.82}
+                  numberOfLines={sectionValueLines}
+                  style={[
+                    styles.sectionValue,
+                    compactText && styles.compactSectionValue,
+                  ]}
+                >
                   {section.value}
                 </Text>
               </View>
             ))}
           </View>
 
-          <View style={styles.footerRow}>
-            <Text numberOfLines={1} style={styles.footerText}>
+          <View
+            style={[styles.footerRow, compactText && styles.compactFooterRow]}
+          >
+            <Text numberOfLines={denseText ? 1 : 2} style={styles.footerText}>
               {card.footer}
             </Text>
             <Text
@@ -200,6 +235,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FFFFFF",
     boxShadow: "0 18px 22px rgba(0, 0, 0, 0.22)",
+  },
+  compactTextCard: {
+    padding: 18,
+  },
+  denseTextCard: {
+    padding: 15,
   },
   imageCard: {
     backgroundColor: "#F8FAFC",
@@ -314,6 +355,10 @@ const styles = StyleSheet.create({
     fontSize: 27,
     fontWeight: "900",
   },
+  compactTitle: {
+    marginTop: 15,
+    fontSize: 23,
+  },
   subtitle: {
     marginTop: 6,
     color: "#475569",
@@ -321,19 +366,35 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "600",
   },
+  compactSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
   divider: {
     height: 1,
     backgroundColor: "#E2E8F0",
     marginVertical: 18,
   },
+  compactDivider: {
+    marginVertical: 12,
+  },
   sections: {
     gap: 10,
+    flexShrink: 1,
+  },
+  compactSections: {
+    gap: 7,
   },
   sectionRow: {
     borderRadius: 15,
     backgroundColor: "#EEF2F7",
     paddingHorizontal: 13,
     paddingVertical: 10,
+  },
+  compactSectionRow: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
   sectionLabel: {
     color: "#64748B",
@@ -348,6 +409,10 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 3,
   },
+  compactSectionValue: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
   footerRow: {
     marginTop: "auto",
     paddingTop: 14,
@@ -355,6 +420,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  compactFooterRow: {
+    paddingTop: 10,
   },
   footerText: {
     flex: 1,

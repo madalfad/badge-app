@@ -21,6 +21,7 @@ import Animated, {
 import type { BadgeCard } from "@/features/cards/types";
 
 import { BadgeReelCard } from "./BadgeReelCard";
+import { getBadgeCardRenderSize } from "./cardSizing";
 import { ReelClip } from "./ReelClip";
 import {
   VISIBLE_CARD_RADIUS,
@@ -53,37 +54,6 @@ type AnimatedReelItemProps = {
   onDoublePress: () => void;
   onLongPress: () => void;
 };
-
-type CardRenderSize = {
-  width: number;
-  height: number;
-};
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getCardRenderSize(
-  card: BadgeCard,
-  maxWidth: number,
-  maxHeight: number,
-): CardRenderSize {
-  const defaultAspectRatio = 1 / 1.45;
-  const rawAspectRatio =
-    card.hasUserImage && card.imageAspectRatio
-      ? card.imageAspectRatio
-      : defaultAspectRatio;
-  const aspectRatio = clamp(rawAspectRatio, 0.28, 3.75);
-  let width = maxWidth;
-  let height = width / aspectRatio;
-
-  if (height > maxHeight) {
-    height = maxHeight;
-    width = height * aspectRatio;
-  }
-
-  return { width, height };
-}
 
 function triggerSelectionHaptic() {
   Haptics.selectionAsync().catch(() => undefined);
@@ -333,7 +303,7 @@ export function BadgeReel({
         <View style={styles.gestureSurface}>
           {visibleCards.map(({ card, index }) => {
             const focused = activeIndex === index;
-            const cardSize = getCardRenderSize(
+            const cardSize = getBadgeCardRenderSize(
               card,
               dimensions.maxCardWidth,
               dimensions.maxCardHeight,
@@ -385,7 +355,7 @@ function ReducedMotionCard({
   onLongPress,
   onPress,
 }: ReducedMotionCardProps) {
-  const cardSize = getCardRenderSize(card, maxWidth, maxHeight);
+  const cardSize = getBadgeCardRenderSize(card, maxWidth, maxHeight);
 
   return (
     <BadgeReelCard

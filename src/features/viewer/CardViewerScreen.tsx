@@ -25,6 +25,7 @@ import {
 import type { BadgeCard, CardAssetRecord } from "@/features/cards/types";
 import { useCard } from "@/features/cards/useCard";
 import { BadgeReelCard } from "@/features/reel/BadgeReelCard";
+import { getBadgeCardRenderSize } from "@/features/reel/cardSizing";
 
 import { ZoomableImage } from "./ZoomableImage";
 
@@ -207,8 +208,16 @@ function CardViewerStage({
   onToggleFavorite,
 }: CardViewerStageProps) {
   const layout = useBadgeLayout();
-  const fallbackWidth = Math.min(layout.width - 54, 320);
-  const fallbackHeight = Math.min(fallbackWidth * 1.44, layout.height * 0.64);
+  const fallbackMaxWidth = Math.min(layout.width - 54, 340);
+  const fallbackMaxHeight = Math.min(
+    fallbackMaxWidth * 1.68,
+    layout.height * 0.68,
+  );
+  const fallbackSize = getBadgeCardRenderSize(
+    card,
+    fallbackMaxWidth,
+    fallbackMaxHeight,
+  );
 
   if (activeImageUri) {
     return (
@@ -228,8 +237,8 @@ function CardViewerStage({
       <BadgeReelCard
         card={card}
         focused
-        width={fallbackWidth}
-        height={fallbackHeight}
+        width={fallbackSize.width}
+        height={fallbackSize.height}
         onPress={onToggleControls}
         onDoublePress={onToggleFavorite}
         onLongPress={onToggleFavorite}
@@ -398,11 +407,15 @@ function MetadataPills({
   highContrast,
   tags,
 }: MetadataPillsProps) {
+  const interactionLabel = activeImageUri
+    ? "Pinch / pan / double tap"
+    : card.sourceType === "sample_seed"
+      ? "Seeded demo card"
+      : "Text badge card";
+
   return (
     <View style={styles.metadataRow}>
-      <InfoPill
-        label={activeImageUri ? "Pinch / pan / double tap" : "Seeded demo card"}
-      />
+      <InfoPill label={interactionLabel} />
       {highContrast ? <InfoPill label="High contrast" /> : null}
       {card.isArchived ? <InfoPill label="Archived" /> : null}
       {tags.map((tag) => (

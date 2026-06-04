@@ -22,11 +22,15 @@ import { NativeStorageWarning } from "@/features/cards/NativeStorageWarning";
 import { DEFAULT_REEL_ID } from "@/features/reels/constants";
 import { ReelMembershipField } from "@/features/reels/ReelMembershipField";
 import { useReels } from "@/features/reels/useReels";
-import { createCardFromImages } from "@/features/cards/cardService";
+import {
+  createCardFromImages,
+  createCardFromText,
+} from "@/features/cards/cardService";
 import {
   CARD_ACCENT_PRESETS,
   parseCardTags,
 } from "@/features/cards/cardMetadata";
+import type { BadgeCardSection } from "@/features/cards/types";
 import {
   launchCardImagePicker,
   type CardImagePickerSource,
@@ -34,9 +38,39 @@ import {
 import type { CropPreset, SourceCardImage } from "@/storage/imagePipeline";
 
 type CardSide = "front" | "back";
+type CardSourceMode = "photo" | "text";
 type PickedCardImage = SourceCardImage & {
   previewUri: string;
 };
+type DraftTextSection = BadgeCardSection & {
+  id: string;
+};
+
+function createDraftTextSection(): DraftTextSection {
+  return {
+    id: `section-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    label: "",
+    value: "",
+  };
+}
+
+function normalizeTextSections(sections: DraftTextSection[]) {
+  return sections.flatMap((section, index) => {
+    const label = section.label.trim();
+    const value = section.value.trim();
+
+    if (!label && !value) {
+      return [];
+    }
+
+    return [
+      {
+        label: label && value ? label : `Line ${index + 1}`,
+        value: value || label,
+      },
+    ];
+  });
+}
 
 function toPickedImage(asset: ImagePicker.ImagePickerAsset): PickedCardImage {
   return {
@@ -56,12 +90,23 @@ export function AddCardSourceScreen() {
   const layout = useBadgeLayout();
   const { db, isReady } = useDatabaseContext();
   const reelsState = useReels();
+  const [sourceMode, setSourceMode] = useState<CardSourceMode>("photo");
   const [frontImage, setFrontImage] = useState<PickedCardImage | null>(null);
   const [backImage, setBackImage] = useState<PickedCardImage | null>(null);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [category, setCategory] = useState("");
   const [tagsText, setTagsText] = useState("");
+  const [code, setCode] = useState("");
+  const [textSections, setTextSections] = useState<DraftTextSection[]>(() => [
+    createDraftTextSection(),
+    createDraftTextSection(),
+    createDraftTextSection(),
+    createDraftTextSection(),
+  ]);
+  const [footer, setFooter] = useState(
+    "Reference only • verify local protocol",
+  );
   const [cropPreset, setCropPreset] = useState<CropPreset>("auto");
   const [accentColor, setAccentColor] = useState(CARD_ACCENT_PRESETS[0]);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -69,8 +114,15 @@ export function AddCardSourceScreen() {
   const [hasInitializedReels, setHasInitializedReels] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const typedSections = useMemo(
+    () => normalizeTextSections(textSections),
+    [textSections],
+  );
   const canSave = Boolean(
-    db && frontImage && title.trim().length > 0 && !isSaving,
+    db &&
+      title.trim().length > 0 &&
+      !isSaving &&
+      (sourceMode === "photo" ? frontImage : typedSections.length > 0),
   );
 
   useEffect(() => {
@@ -160,8 +212,34 @@ export function AddCardSourceScreen() {
     setBackImage(update);
   };
 
+  const updateTextSection = (
+    sectionId: string,
+    patch: Partial<BadgeCardSection>,
+  ) => {
+    setTextSections((currentSections) =>
+      currentSections.map((section) =>
+        section.id === sectionId ? { ...section, ...patch } : section,
+      ),
+    );
+  };
+
+  const addTextSection = () => {
+    setTextSections((currentSections) => [
+      ...currentSections,
+      createDraftTextSection(),
+    ]);
+  };
+
+  const removeTextSection = (sectionId: string) => {
+    setTextSections((currentSections) =>
+      currentSections.length <= 1
+        ? currentSections
+        : currentSections.filter((section) => section.id !== sectionId),
+    );
+  };
+
   const handleSave = async () => {
-    if (!db || !frontImage) {
+    if (!db) {
       Alert.alert(
         "Native storage unavailable",
         "Adding cards requires the native SQLite/file-system runtime.",
@@ -177,19 +255,50 @@ export function AddCardSourceScreen() {
       return;
     }
 
+    if (sourceMode === "photo" && !frontImage) {
+      Alert.alert("Front image required", "Add a front image before saving.");
+      return;
+    }
+
+    if (sourceMode === "text" && typedSections.length === 0) {
+      Alert.alert("Text row required", "Add at least one text row.");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const cardId = await createCardFromImages(db, {
-        title,
-        subtitle,
-        categoryName: category,
-        tags,
-        isFavorite,
-        primaryColor: accentColor,
-        frontImage: { ...frontImage, cropPreset },
-        backImage: backImage ? { ...backImage, cropPreset } : null,
-        reelIds: selectedReelIds,
-      });
+      let cardId: string;
+
+      if (sourceMode === "photo") {
+        if (!frontImage) {
+          return;
+        }
+
+        cardId = await createCardFromImages(db, {
+          title,
+          subtitle,
+          categoryName: category,
+          tags,
+          isFavorite,
+          primaryColor: accentColor,
+          frontImage: { ...frontImage, cropPreset },
+          backImage: backImage ? { ...backImage, cropPreset } : null,
+          reelIds: selectedReelIds,
+        });
+      } else {
+        cardId = await createCardFromText(db, {
+          title,
+          subtitle,
+          categoryName: category,
+          tags,
+          isFavorite,
+          primaryColor: accentColor,
+          code,
+          sections: typedSections,
+          footer,
+          reelIds: selectedReelIds,
+        });
+      }
 
       router.replace({
         pathname: "/card/[id]",
@@ -200,7 +309,9 @@ export function AddCardSourceScreen() {
         "Couldn’t save card",
         caughtError instanceof Error
           ? caughtError.message
-          : "The image could not be processed. Try another image or retake the photo.",
+          : sourceMode === "photo"
+            ? "The image could not be processed. Try another image or retake the photo."
+            : "The text card could not be saved.",
       );
     } finally {
       setIsSaving(false);
@@ -214,7 +325,7 @@ export function AddCardSourceScreen() {
         style={styles.keyboardAvoidingView}
       >
         <CardEditorHeader
-          eyebrow="Import card"
+          eyebrow={sourceMode === "photo" ? "Import card" : "Typed card"}
           title="Add badge card"
           canSave={canSave}
           isSaving={isSaving}
@@ -241,50 +352,81 @@ export function AddCardSourceScreen() {
           ) : null}
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Images</Text>
-            <ImagePickerPanel
-              label="Front side"
-              image={frontImage}
-              required
-              onCamera={() => launchPicker("front", "camera")}
-              onLibrary={() => launchPicker("front", "library")}
-              onRotate={() => rotateImage("front")}
-              onClear={() => setFrontImage(null)}
-            />
-            <ImagePickerPanel
-              label="Back side"
-              image={backImage}
-              onCamera={() => launchPicker("back", "camera")}
-              onLibrary={() => launchPicker("back", "library")}
-              onRotate={() => rotateImage("back")}
-              onClear={() => setBackImage(null)}
-            />
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Crop preset</Text>
+            <Text style={styles.sectionTitle}>Source</Text>
             <View style={styles.segmentRow}>
               <SegmentButton
-                label="Original"
-                selected={cropPreset === "auto"}
-                onPress={() => setCropPreset("auto")}
+                label="Photo card"
+                selected={sourceMode === "photo"}
+                onPress={() => setSourceMode("photo")}
               />
               <SegmentButton
-                label="Landscape crop"
-                selected={cropPreset === "landscape"}
-                onPress={() => setCropPreset("landscape")}
-              />
-              <SegmentButton
-                label="Portrait crop"
-                selected={cropPreset === "portrait"}
-                onPress={() => setCropPreset("portrait")}
+                label="Text card"
+                selected={sourceMode === "text"}
+                onPress={() => setSourceMode("text")}
               />
             </View>
-            <Text style={styles.helperText}>
-              Original preserves the imported badge size. Crop presets are only
-              applied when you want a standard card shape.
-            </Text>
           </View>
+
+          {sourceMode === "photo" ? (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Images</Text>
+                <ImagePickerPanel
+                  label="Front side"
+                  image={frontImage}
+                  required
+                  onCamera={() => launchPicker("front", "camera")}
+                  onLibrary={() => launchPicker("front", "library")}
+                  onRotate={() => rotateImage("front")}
+                  onClear={() => setFrontImage(null)}
+                />
+                <ImagePickerPanel
+                  label="Back side"
+                  image={backImage}
+                  onCamera={() => launchPicker("back", "camera")}
+                  onLibrary={() => launchPicker("back", "library")}
+                  onRotate={() => rotateImage("back")}
+                  onClear={() => setBackImage(null)}
+                />
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Crop preset</Text>
+                <View style={styles.segmentRow}>
+                  <SegmentButton
+                    label="Original"
+                    selected={cropPreset === "auto"}
+                    onPress={() => setCropPreset("auto")}
+                  />
+                  <SegmentButton
+                    label="Landscape crop"
+                    selected={cropPreset === "landscape"}
+                    onPress={() => setCropPreset("landscape")}
+                  />
+                  <SegmentButton
+                    label="Portrait crop"
+                    selected={cropPreset === "portrait"}
+                    onPress={() => setCropPreset("portrait")}
+                  />
+                </View>
+                <Text style={styles.helperText}>
+                  Original preserves the imported badge size. Crop presets are
+                  only applied when you want a standard card shape.
+                </Text>
+              </View>
+            </>
+          ) : (
+            <TextCardContentEditor
+              code={code}
+              footer={footer}
+              sections={textSections}
+              onAddSection={addTextSection}
+              onCodeChange={setCode}
+              onFooterChange={setFooter}
+              onRemoveSection={removeTextSection}
+              onUpdateSection={updateTextSection}
+            />
+          )}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Metadata</Text>
@@ -352,6 +494,84 @@ export function AddCardSourceScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+type TextCardContentEditorProps = {
+  code: string;
+  footer: string;
+  sections: DraftTextSection[];
+  onAddSection: () => void;
+  onCodeChange: (value: string) => void;
+  onFooterChange: (value: string) => void;
+  onRemoveSection: (sectionId: string) => void;
+  onUpdateSection: (
+    sectionId: string,
+    patch: Partial<BadgeCardSection>,
+  ) => void;
+};
+
+function TextCardContentEditor({
+  code,
+  footer,
+  sections,
+  onAddSection,
+  onCodeChange,
+  onFooterChange,
+  onRemoveSection,
+  onUpdateSection,
+}: TextCardContentEditorProps) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Text card</Text>
+      <CardFormField
+        label="Code"
+        value={code}
+        placeholder="e.g. ED-11"
+        onChangeText={onCodeChange}
+      />
+      <View style={styles.textRows}>
+        {sections.map((section, index) => (
+          <View key={section.id} style={styles.textRowGroup}>
+            <View style={styles.textRowHeader}>
+              <Text style={styles.textRowTitle}>Row {index + 1}</Text>
+              <ActionButton
+                label="Remove"
+                disabled={sections.length <= 1}
+                onPress={() => onRemoveSection(section.id)}
+              />
+            </View>
+            <CardFormField
+              label="Label"
+              value={section.label}
+              placeholder="e.g. Epinephrine"
+              onChangeText={(value) =>
+                onUpdateSection(section.id, { label: value })
+              }
+            />
+            <CardFormField
+              label="Value"
+              value={section.value}
+              placeholder="e.g. 1 mg IV/IO q3-5 min"
+              multiline
+              numberOfLines={3}
+              onChangeText={(value) =>
+                onUpdateSection(section.id, { value })
+              }
+            />
+          </View>
+        ))}
+      </View>
+      <ActionButton label="Add row" onPress={onAddSection} />
+      <CardFormField
+        label="Footer"
+        value={footer}
+        placeholder="Reference note"
+        multiline
+        numberOfLines={2}
+        onChangeText={onFooterChange}
+      />
+    </View>
   );
 }
 
@@ -633,6 +853,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "700",
+  },
+  textRows: {
+    gap: 16,
+  },
+  textRowGroup: {
+    borderTopWidth: 1,
+    borderTopColor: "#26364F",
+    paddingTop: 14,
+    gap: 12,
+  },
+  textRowHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  textRowTitle: {
+    color: "#F8FAFC",
+    fontSize: 14,
+    fontWeight: "900",
   },
 
   inputLabel: {

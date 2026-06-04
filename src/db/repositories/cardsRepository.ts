@@ -65,6 +65,7 @@ function mapCardRowToBadgeCard(row: CardRow): BadgeCard {
     code: notes.code ?? row.source_type.toUpperCase(),
     sections: notes.sections ?? [],
     footer: notes.footer ?? "Reference only • verify local protocol",
+    sourceType: row.source_type,
     isFavorite: row.is_favorite === 1,
     isArchived: row.is_archived === 1,
     lastViewedAt: row.last_viewed_at,

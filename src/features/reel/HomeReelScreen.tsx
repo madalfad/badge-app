@@ -31,7 +31,7 @@ import { useBooleanSetting } from "@/features/settings/useBooleanSetting";
 
 import { BadgeReel } from "./BadgeReel";
 
-type HomePanel = "reels" | "search" | "more" | null;
+type HomePanel = "reels" | "search" | "settings" | null;
 
 export function HomeReelScreen() {
   const router = useRouter();
@@ -47,14 +47,8 @@ export function HomeReelScreen() {
     reload,
     toggleFavorite,
   } = useCards({ reelId: reelsState.selectedReelId });
-  const [reduceMotion, setReduceMotion] = useBooleanSetting(
-    "reduce_motion_enabled",
-    false,
-  );
-  const [hapticsEnabled, setHapticsEnabled] = useBooleanSetting(
-    "haptics_enabled",
-    true,
-  );
+  const [reduceMotion] = useBooleanSetting("reduce_motion_enabled", false);
+  const [hapticsEnabled] = useBooleanSetting("haptics_enabled", true);
   const [quickActionCard, setQuickActionCard] = useState<BadgeCard | null>(
     null,
   );
@@ -213,9 +207,9 @@ export function HomeReelScreen() {
             isFiltering={isFiltering}
             onAdd={() => router.push("/add")}
             onHome={returnHome}
-            onMore={() => openPanel("more")}
             onReels={() => openPanel("reels")}
             onSearch={() => openPanel("search")}
+            onSettings={() => openPanel("settings")}
           />
         </View>
       </SafeAreaView>
@@ -225,42 +219,20 @@ export function HomeReelScreen() {
         onClose={() => setActivePanel(null)}
       >
         {activePanel === "reels" ? (
-          <>
-            <View style={styles.sheetControls}>
-              <Text style={styles.sheetSectionTitle}>Display</Text>
-              <View style={styles.sheetControlsRow}>
-                <ToggleButton
-                  label="3D"
-                  selected={!reduceMotion}
-                  onPress={() => setReduceMotion(false)}
-                />
-                <ToggleButton
-                  label="Calm"
-                  selected={reduceMotion}
-                  onPress={() => setReduceMotion(true)}
-                />
-                <ToggleButton
-                  label="Haptic"
-                  selected={hapticsEnabled}
-                  onPress={() => setHapticsEnabled((enabled) => !enabled)}
-                />
-              </View>
-            </View>
-            <ReelSelector
-              reels={reelsState.reels}
-              selectedReelId={reelsState.selectedReelId}
-              allActiveCardCount={reelsState.allActiveCardCount}
-              isLoading={reelsState.isLoading}
-              onSelectReel={(reelId) => {
-                reelsState.selectReel(reelId).catch(() => undefined);
-              }}
-              onCreateReel={reelsState.createNewReel}
-              onUpdateReel={reelsState.updateExistingReel}
-              onArchiveReel={reelsState.archiveExistingReel}
-              onDeleteReel={reelsState.deleteExistingReel}
-              onMoveReel={reelsState.moveReel}
-            />
-          </>
+          <ReelSelector
+            reels={reelsState.reels}
+            selectedReelId={reelsState.selectedReelId}
+            allActiveCardCount={reelsState.allActiveCardCount}
+            isLoading={reelsState.isLoading}
+            onSelectReel={(reelId) => {
+              reelsState.selectReel(reelId).catch(() => undefined);
+            }}
+            onCreateReel={reelsState.createNewReel}
+            onUpdateReel={reelsState.updateExistingReel}
+            onArchiveReel={reelsState.archiveExistingReel}
+            onDeleteReel={reelsState.deleteExistingReel}
+            onMoveReel={reelsState.moveReel}
+          />
         ) : null}
 
         {activePanel === "search" ? (
@@ -276,8 +248,8 @@ export function HomeReelScreen() {
           />
         ) : null}
 
-        {activePanel === "more" ? (
-          <View style={styles.morePanel}>
+        {activePanel === "settings" ? (
+          <View style={styles.settingsPanel}>
             <ActionButton
               label="Settings"
               onPress={() => {
@@ -310,9 +282,9 @@ type HomeBottomNavProps = {
   isFiltering: boolean;
   onAdd: () => void;
   onHome: () => void;
-  onMore: () => void;
   onReels: () => void;
   onSearch: () => void;
+  onSettings: () => void;
 };
 
 function HomeBottomNav({
@@ -320,9 +292,9 @@ function HomeBottomNav({
   isFiltering,
   onAdd,
   onHome,
-  onMore,
   onReels,
   onSearch,
+  onSettings,
 }: HomeBottomNavProps) {
   return (
     <View style={styles.bottomNav}>
@@ -336,24 +308,36 @@ function HomeBottomNav({
         selected={activePanel === "search" || (!activePanel && isFiltering)}
         onPress={onSearch}
       />
-      <NavButton home label="Home" selected={!activePanel && !isFiltering} onPress={onHome} />
+      <NavButton
+        home
+        label="Home"
+        selected={!activePanel && !isFiltering}
+        onPress={onHome}
+      />
       <NavButton label="Add" onPress={onAdd} />
-      <NavButton label="More" selected={activePanel === "more"} onPress={onMore} />
+      <NavButton
+        icon="⚙"
+        label="Settings"
+        selected={activePanel === "settings"}
+        onPress={onSettings}
+      />
     </View>
   );
 }
 
 type NavButtonProps = {
   label: string;
+  icon?: string;
   home?: boolean;
   selected?: boolean;
   onPress: () => void;
 };
 
-function NavButton({ home, label, selected, onPress }: NavButtonProps) {
+function NavButton({ home, icon, label, selected, onPress }: NavButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [
@@ -363,7 +347,20 @@ function NavButton({ home, label, selected, onPress }: NavButtonProps) {
         pressed && styles.pressed,
       ]}
     >
+      {icon ? (
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.navButtonIcon,
+            selected && styles.navButtonTextSelected,
+          ]}
+        >
+          {icon}
+        </Text>
+      ) : null}
       <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.85}
         numberOfLines={1}
         style={[
           styles.navButtonText,
@@ -386,7 +383,7 @@ type HomePanelModalProps = {
 function HomePanelModal({ children, onClose, panel }: HomePanelModalProps) {
   const layout = useBadgeLayout();
   const title =
-    panel === "reels" ? "Reels" : panel === "search" ? "Search" : "More";
+    panel === "reels" ? "Reels" : panel === "search" ? "Search" : "Settings";
 
   return (
     <Modal
@@ -521,36 +518,6 @@ function HomeReelContent({
       onCardPress={onCardPress}
       onFavoriteToggle={onFavoriteToggle}
     />
-  );
-}
-
-type ToggleButtonProps = {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-};
-
-function ToggleButton({ label, selected, onPress }: ToggleButtonProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.toggleButton,
-        selected && styles.toggleButtonSelected,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text
-        style={[
-          styles.toggleButtonText,
-          selected && styles.toggleButtonTextSelected,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -718,26 +685,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 1,
   },
-  toggleButton: {
-    borderRadius: 999,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    backgroundColor: "#101C2E",
-    borderWidth: 1,
-    borderColor: "#26364F",
-  },
-  toggleButtonSelected: {
-    backgroundColor: "#2DD4BF22",
-    borderColor: "#2DD4BF99",
-  },
-  toggleButtonText: {
-    color: "#94A3B8",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  toggleButtonTextSelected: {
-    color: "#F8FAFC",
-  },
   reelWrapper: {
     flex: 1,
     justifyContent: "center",
@@ -825,6 +772,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+    gap: 1,
     paddingHorizontal: 6,
   },
   homeNavButton: {
@@ -840,6 +788,14 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontSize: 11,
     fontWeight: "900",
+    textAlign: "center",
+    width: "100%",
+  },
+  navButtonIcon: {
+    color: "#94A3B8",
+    fontSize: 16,
+    fontWeight: "900",
+    lineHeight: 18,
   },
   homeNavButtonText: {
     color: "#04111F",
@@ -899,26 +855,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
-  sheetControls: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#26364F",
-    backgroundColor: "#101C2E",
-    padding: 12,
-    gap: 10,
-    marginHorizontal: 16,
-  },
-  sheetSectionTitle: {
-    color: "#F8FAFC",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  sheetControlsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  morePanel: {
+  settingsPanel: {
     paddingHorizontal: 16,
     gap: 10,
   },

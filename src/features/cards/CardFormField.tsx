@@ -1,4 +1,10 @@
-import { StyleSheet, Text, View } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type TextStyle,
+} from "react-native";
 
 import { BadgeTextField, badgeColors } from "@/components/badge-ui";
 
@@ -6,11 +12,17 @@ type CardFormFieldProps = {
   label: string;
   value: string;
   placeholder: string;
+  inputStyle?: StyleProp<TextStyle>;
+  multiline?: boolean;
+  numberOfLines?: number;
   onChangeText: (value: string) => void;
 };
 
 export function CardFormField({
+  inputStyle,
   label,
+  multiline,
+  numberOfLines,
   value,
   placeholder,
   onChangeText,
@@ -19,10 +31,13 @@ export function CardFormField({
     <View style={styles.field}>
       <Text style={styles.inputLabel}>{label}</Text>
       <BadgeTextField
+        multiline={multiline}
+        numberOfLines={numberOfLines}
         value={value}
         placeholder={placeholder}
+        textAlignVertical={multiline ? "top" : "center"}
         onChangeText={onChangeText}
-        style={styles.input}
+        style={[styles.input, multiline && styles.multilineInput, inputStyle]}
       />
     </View>
   );
@@ -43,5 +58,9 @@ const styles = StyleSheet.create({
     backgroundColor: badgeColors.inputBg,
     borderColor: badgeColors.border,
     fontSize: 15,
+  },
+  multilineInput: {
+    minHeight: 92,
+    paddingTop: 13,
   },
 });
