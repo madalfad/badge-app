@@ -30,7 +30,13 @@ import {
   CARD_ACCENT_PRESETS,
   parseCardTags,
 } from "@/features/cards/cardMetadata";
-import type { BadgeCardSection } from "@/features/cards/types";
+import {
+  createDraftTextSection,
+  normalizeTextSections,
+  TextCardContentEditor,
+  type DraftTextSection,
+  type TextSectionPatch,
+} from "@/features/cards/TextCardContentEditor";
 import {
   launchCardImagePicker,
   type CardImagePickerSource,
@@ -42,35 +48,6 @@ type CardSourceMode = "photo" | "text";
 type PickedCardImage = SourceCardImage & {
   previewUri: string;
 };
-type DraftTextSection = BadgeCardSection & {
-  id: string;
-};
-
-function createDraftTextSection(): DraftTextSection {
-  return {
-    id: `section-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    label: "",
-    value: "",
-  };
-}
-
-function normalizeTextSections(sections: DraftTextSection[]) {
-  return sections.flatMap((section, index) => {
-    const label = section.label.trim();
-    const value = section.value.trim();
-
-    if (!label && !value) {
-      return [];
-    }
-
-    return [
-      {
-        label: label && value ? label : `Line ${index + 1}`,
-        value: value || label,
-      },
-    ];
-  });
-}
 
 function toPickedImage(asset: ImagePicker.ImagePickerAsset): PickedCardImage {
   return {
@@ -214,7 +191,7 @@ export function AddCardSourceScreen() {
 
   const updateTextSection = (
     sectionId: string,
-    patch: Partial<BadgeCardSection>,
+    patch: TextSectionPatch,
   ) => {
     setTextSections((currentSections) =>
       currentSections.map((section) =>
@@ -497,84 +474,6 @@ export function AddCardSourceScreen() {
   );
 }
 
-type TextCardContentEditorProps = {
-  code: string;
-  footer: string;
-  sections: DraftTextSection[];
-  onAddSection: () => void;
-  onCodeChange: (value: string) => void;
-  onFooterChange: (value: string) => void;
-  onRemoveSection: (sectionId: string) => void;
-  onUpdateSection: (
-    sectionId: string,
-    patch: Partial<BadgeCardSection>,
-  ) => void;
-};
-
-function TextCardContentEditor({
-  code,
-  footer,
-  sections,
-  onAddSection,
-  onCodeChange,
-  onFooterChange,
-  onRemoveSection,
-  onUpdateSection,
-}: TextCardContentEditorProps) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Text card</Text>
-      <CardFormField
-        label="Code"
-        value={code}
-        placeholder="e.g. ED-11"
-        onChangeText={onCodeChange}
-      />
-      <View style={styles.textRows}>
-        {sections.map((section, index) => (
-          <View key={section.id} style={styles.textRowGroup}>
-            <View style={styles.textRowHeader}>
-              <Text style={styles.textRowTitle}>Row {index + 1}</Text>
-              <ActionButton
-                label="Remove"
-                disabled={sections.length <= 1}
-                onPress={() => onRemoveSection(section.id)}
-              />
-            </View>
-            <CardFormField
-              label="Label"
-              value={section.label}
-              placeholder="e.g. Epinephrine"
-              onChangeText={(value) =>
-                onUpdateSection(section.id, { label: value })
-              }
-            />
-            <CardFormField
-              label="Value"
-              value={section.value}
-              placeholder="e.g. 1 mg IV/IO q3-5 min"
-              multiline
-              numberOfLines={3}
-              onChangeText={(value) =>
-                onUpdateSection(section.id, { value })
-              }
-            />
-          </View>
-        ))}
-      </View>
-      <ActionButton label="Add row" onPress={onAddSection} />
-      <CardFormField
-        label="Footer"
-        value={footer}
-        placeholder="Reference note"
-        multiline
-        numberOfLines={2}
-        onChangeText={onFooterChange}
-      />
-    </View>
-  );
-}
-
 type ImagePickerPanelProps = {
   label: string;
   image: PickedCardImage | null;
@@ -854,27 +753,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: "700",
   },
-  textRows: {
-    gap: 16,
-  },
-  textRowGroup: {
-    borderTopWidth: 1,
-    borderTopColor: "#26364F",
-    paddingTop: 14,
-    gap: 12,
-  },
-  textRowHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  textRowTitle: {
-    color: "#F8FAFC",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-
   inputLabel: {
     color: "#CBD5E1",
     fontSize: 12,

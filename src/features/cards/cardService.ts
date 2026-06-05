@@ -56,6 +56,12 @@ type CreateCardFromTextInput = {
   reelIds?: string[];
 };
 
+type UpdateCardTextContentInput = {
+  code?: string | null;
+  sections: BadgeCardSection[];
+  footer?: string | null;
+};
+
 type UpdateCardMetadataInput = {
   title: string;
   subtitle?: string | null;
@@ -71,6 +77,7 @@ type NextSortOrderRow = {
 };
 
 const DEFAULT_ACCENT = "#2DD4BF";
+const DEFAULT_TEXT_CARD_FOOTER = "Reference only • verify local protocol";
 
 async function getNextSortOrder(db: AppDatabase) {
   const row = await db.getFirstAsync<NextSortOrderRow>(
@@ -99,6 +106,29 @@ function toAssetUpsertInput(
     fileSize: asset.fileSize,
     cropDataJson: asset.cropDataJson,
   };
+}
+
+function normalizeCardSections(sections: BadgeCardSection[]) {
+  return sections
+    .map((section) => ({
+      label: section.label.trim(),
+      value: section.value.trim(),
+    }))
+    .filter((section) => section.label && section.value);
+}
+
+function createTextCardNotes(input: UpdateCardTextContentInput) {
+  const sections = normalizeCardSections(input.sections);
+
+  if (sections.length === 0) {
+    throw new Error("Add at least one text row before saving.");
+  }
+
+  return JSON.stringify({
+    code: input.code?.trim() || "TEXT",
+    sections,
+    footer: input.footer?.trim() || DEFAULT_TEXT_CARD_FOOTER,
+  });
 }
 
 export async function createCardFromImages(
@@ -166,17 +196,6 @@ export async function createCardFromText(
     throw new Error("A card title is required.");
   }
 
-  const sections = input.sections
-    .map((section) => ({
-      label: section.label.trim(),
-      value: section.value.trim(),
-    }))
-    .filter((section) => section.label && section.value);
-
-  if (sections.length === 0) {
-    throw new Error("Add at least one text row before saving.");
-  }
-
   const cardId = createId("card");
 
   await withWriteTransaction(db, async (txn) => {
@@ -198,12 +217,7 @@ export async function createCardFromText(
       sortOrder,
       isFavorite: input.isFavorite ?? false,
       sourceType: "user_text",
-      notes: JSON.stringify({
-        code: input.code?.trim() || "TEXT",
-        sections,
-        footer:
-          input.footer?.trim() || "Reference only • verify local protocol",
-      }),
+      notes: createTextCardNotes(input),
     });
 
     if (input.tags) {
@@ -214,6 +228,17 @@ export async function createCardFromText(
   });
 
   return cardId;
+}
+
+export async function updateCardTextContent(
+  db: AppDatabase,
+  cardId: string,
+  input: UpdateCardTextContentInput,
+) {
+  await updateCard(db, cardId, {
+    sourceType: "user_text",
+    notes: createTextCardNotes(input),
+  });
 }
 
 export async function updateCardMetadata(

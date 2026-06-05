@@ -25,11 +25,20 @@ import {
   removeCardAssetSide,
   replaceCardAssetImage,
   updateCardMetadata,
+  updateCardTextContent,
 } from "@/features/cards/cardService";
 import {
   CARD_ACCENT_PRESETS,
   parseCardTags,
 } from "@/features/cards/cardMetadata";
+import {
+  createDraftTextSection,
+  createDraftTextSectionsFromSections,
+  normalizeTextSections,
+  TextCardContentEditor,
+  type DraftTextSection,
+  type TextSectionPatch,
+} from "@/features/cards/TextCardContentEditor";
 import { useCard } from "@/features/cards/useCard";
 import {
   launchCardImagePicker,
@@ -80,6 +89,11 @@ export function EditCardScreen() {
   const [subtitle, setSubtitle] = useState("");
   const [category, setCategory] = useState("");
   const [tagsText, setTagsText] = useState("");
+  const [code, setCode] = useState("");
+  const [textSections, setTextSections] = useState<DraftTextSection[]>(() => [
+    createDraftTextSection(),
+  ]);
+  const [footer, setFooter] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
   const [accentColor, setAccentColor] = useState(CARD_ACCENT_PRESETS[0]);
   const [selectedReelIds, setSelectedReelIds] = useState<string[]>([]);
@@ -102,6 +116,19 @@ export function EditCardScreen() {
     () => assets.find((asset) => asset.side === "back") ?? null,
     [assets],
   );
+  const typedSections = useMemo(
+    () => normalizeTextSections(textSections),
+    [textSections],
+  );
+  const canEditTextContent = Boolean(
+    card &&
+      (card.sourceType === "user_text" ||
+        card.sourceType === "sample_seed" ||
+        (!frontAsset && card.sections.length > 0)),
+  );
+  const shouldShowImageEditor = Boolean(
+    frontAsset || backAsset || !canEditTextContent,
+  );
 
   useEffect(() => {
     if (!card || initializedCardId === card.id) {
@@ -112,6 +139,9 @@ export function EditCardScreen() {
     setSubtitle(card.subtitle ?? "");
     setCategory(card.category === "Uncategorized" ? "" : card.category);
     setTagsText(tags.join(", "));
+    setCode(card.code);
+    setTextSections(createDraftTextSectionsFromSections(card.sections));
+    setFooter(card.footer);
     setIsFavorite(card.isFavorite);
     setAccentColor(card.accentColor);
     setInitializedCardId(card.id);
@@ -138,7 +168,11 @@ export function EditCardScreen() {
   }, [cardId, initializedReelCardId, isLoading, reelIds, reelsState.reels]);
 
   const canSaveMetadata = Boolean(
-    db && cardId && title.trim().length > 0 && !isSavingMetadata,
+    db &&
+      cardId &&
+      title.trim().length > 0 &&
+      (!canEditTextContent || typedSections.length > 0) &&
+      !isSavingMetadata,
   );
 
   const launchPicker = async (
@@ -177,6 +211,32 @@ export function EditCardScreen() {
     setPendingBackImage(update);
   };
 
+  const updateTextSection = (
+    sectionId: string,
+    patch: TextSectionPatch,
+  ) => {
+    setTextSections((currentSections) =>
+      currentSections.map((section) =>
+        section.id === sectionId ? { ...section, ...patch } : section,
+      ),
+    );
+  };
+
+  const addTextSection = () => {
+    setTextSections((currentSections) => [
+      ...currentSections,
+      createDraftTextSection(),
+    ]);
+  };
+
+  const removeTextSection = (sectionId: string) => {
+    setTextSections((currentSections) =>
+      currentSections.length <= 1
+        ? currentSections
+        : currentSections.filter((section) => section.id !== sectionId),
+    );
+  };
+
   const saveMetadata = async () => {
     if (!db || !cardId) {
       Alert.alert(
@@ -188,6 +248,11 @@ export function EditCardScreen() {
 
     if (!title.trim()) {
       Alert.alert("Title required", "Give this badge card a short title.");
+      return;
+    }
+
+    if (canEditTextContent && typedSections.length === 0) {
+      Alert.alert("Text row required", "Add at least one text row.");
       return;
     }
 
@@ -203,11 +268,20 @@ export function EditCardScreen() {
         primaryColor: accentColor,
         reelIds: selectedReelIds,
       });
-      setStatusMessage("Metadata saved.");
+
+      if (canEditTextContent) {
+        await updateCardTextContent(db, cardId, {
+          code,
+          sections: typedSections,
+          footer,
+        });
+      }
+
+      setStatusMessage(canEditTextContent ? "Card saved." : "Metadata saved.");
       await Promise.all([reload(), reelsState.reload()]);
     } catch (caughtError) {
       Alert.alert(
-        "Couldn’t save metadata",
+        canEditTextContent ? "Couldn’t save card" : "Couldn’t save metadata",
         caughtError instanceof Error
           ? caughtError.message
           : "The card metadata could not be updated.",
@@ -389,6 +463,19 @@ export function EditCardScreen() {
             onAccentColorChange={setAccentColor}
           />
 
+          {canEditTextContent ? (
+            <TextCardContentEditor
+              code={code}
+              footer={footer}
+              sections={textSections}
+              onAddSection={addTextSection}
+              onCodeChange={setCode}
+              onFooterChange={setFooter}
+              onRemoveSection={removeTextSection}
+              onUpdateSection={updateTextSection}
+            />
+          ) : null}
+
           <ReelMembershipField
             reels={reelsState.reels}
             selectedReelIds={selectedReelIds}
@@ -396,36 +483,39 @@ export function EditCardScreen() {
             onChange={setSelectedReelIds}
           />
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Images</Text>
-            <Text style={styles.sectionHelp}>
-              Replacements are staged until you tap Save image. The previous
-              stored files are removed only after the database update succeeds.
-            </Text>
-            <AssetReplacementPanel
-              side="front"
-              asset={frontAsset}
-              pendingImage={pendingFrontImage}
-              isSaving={savingSide === "front"}
-              onCamera={() => launchPicker("front", "camera")}
-              onLibrary={() => launchPicker("front", "library")}
-              onRotate={() => rotatePendingImage("front")}
-              onDiscardPending={() => setPendingFrontImage(null)}
-              onSaveReplacement={() => savePendingImage("front")}
-            />
-            <AssetReplacementPanel
-              side="back"
-              asset={backAsset}
-              pendingImage={pendingBackImage}
-              isSaving={savingSide === "back"}
-              onCamera={() => launchPicker("back", "camera")}
-              onLibrary={() => launchPicker("back", "library")}
-              onRotate={() => rotatePendingImage("back")}
-              onDiscardPending={() => setPendingBackImage(null)}
-              onSaveReplacement={() => savePendingImage("back")}
-              onRemove={removeBackImage}
-            />
-          </View>
+          {shouldShowImageEditor ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Images</Text>
+              <Text style={styles.sectionHelp}>
+                Replacements are staged until you tap Save image. The previous
+                stored files are removed only after the database update
+                succeeds.
+              </Text>
+              <AssetReplacementPanel
+                side="front"
+                asset={frontAsset}
+                pendingImage={pendingFrontImage}
+                isSaving={savingSide === "front"}
+                onCamera={() => launchPicker("front", "camera")}
+                onLibrary={() => launchPicker("front", "library")}
+                onRotate={() => rotatePendingImage("front")}
+                onDiscardPending={() => setPendingFrontImage(null)}
+                onSaveReplacement={() => savePendingImage("front")}
+              />
+              <AssetReplacementPanel
+                side="back"
+                asset={backAsset}
+                pendingImage={pendingBackImage}
+                isSaving={savingSide === "back"}
+                onCamera={() => launchPicker("back", "camera")}
+                onLibrary={() => launchPicker("back", "library")}
+                onRotate={() => rotatePendingImage("back")}
+                onDiscardPending={() => setPendingBackImage(null)}
+                onSaveReplacement={() => savePendingImage("back")}
+                onRemove={removeBackImage}
+              />
+            </View>
+          ) : null}
 
           <View style={styles.dangerZone}>
             <Text style={styles.dangerTitle}>Danger zone</Text>
