@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   PanResponder,
@@ -58,6 +58,14 @@ type ContainRect = {
 };
 
 type DragTarget = keyof CropCorners | "top" | "right" | "bottom" | "left";
+
+type DragSession = {
+  rect: ContainRect;
+  startCorners: CropCorners;
+  startX: number;
+  startY: number;
+  target: DragTarget;
+};
 
 function getInitialCropData(image: EditableCropImage): PerspectiveCropData {
   return (
@@ -186,7 +194,8 @@ export function PerspectiveCropEditorModal({
   const [corners, setCorners] = useState<CropCorners>(getFullFrameCorners);
   const [rotation, setRotation] = useState(0);
   const [preset, setPreset] = useState<CropPreset>("free");
-  const dragStartCorners = useRef<CropCorners>(corners);
+  const cornersRef = useRef<CropCorners>(corners);
+  const dragSession = useRef<DragSession | null>(null);
 
   useEffect(() => {
     if (!visible || !image) {
@@ -194,6 +203,7 @@ export function PerspectiveCropEditorModal({
     }
 
     const cropData = getInitialCropData(image);
+    cornersRef.current = cropData.corners;
     setCorners(cropData.corners);
     setRotation(cropData.rotation);
     setPreset(cropData.preset ?? "free");
@@ -215,6 +225,16 @@ export function PerspectiveCropEditorModal({
       ),
     [frame, rotatedDimensions.height, rotatedDimensions.width],
   );
+  const imageRectRef = useRef<ContainRect>(imageRect);
+
+  useEffect(() => {
+    cornersRef.current = corners;
+  }, [corners]);
+
+  useEffect(() => {
+    imageRectRef.current = imageRect;
+  }, [imageRect]);
+
   const framePoints = useMemo(
     () => ({
       tl: pointToFrame(corners.tl, imageRect),
@@ -226,6 +246,77 @@ export function PerspectiveCropEditorModal({
   );
   const polygonPoints = `${framePoints.tl.x},${framePoints.tl.y} ${framePoints.tr.x},${framePoints.tr.y} ${framePoints.br.x},${framePoints.br.y} ${framePoints.bl.x},${framePoints.bl.y}`;
   const handlePoints = getHandlePoints(corners);
+
+  const beginDrag = useCallback((target: DragTarget, x: number, y: number) => {
+    dragSession.current = {
+      rect: imageRectRef.current,
+      startCorners: cornersRef.current,
+      startX: x,
+      startY: y,
+      target,
+    };
+  }, []);
+
+  const updateDrag = useCallback((x: number, y: number) => {
+    const session = dragSession.current;
+
+    if (
+      !session ||
+      session.rect.width <= 0 ||
+      session.rect.height <= 0
+    ) {
+      return;
+    }
+
+    const nextCorners = moveTarget(
+      session.startCorners,
+      session.target,
+      (x - session.startX) / session.rect.width,
+      (y - session.startY) / session.rect.height,
+    );
+    cornersRef.current = nextCorners;
+    setPreset((currentPreset) =>
+      currentPreset === "free" ? currentPreset : "free",
+    );
+    setCorners(nextCorners);
+  }, []);
+
+  const endDrag = useCallback(() => {
+    dragSession.current = null;
+  }, []);
+
+  const createPanResponder = useCallback(
+    (target: DragTarget) =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          const touch = event.nativeEvent;
+          beginDrag(target, touch.pageX, touch.pageY);
+        },
+        onPanResponderMove: (event) => {
+          const touch = event.nativeEvent;
+          updateDrag(touch.pageX, touch.pageY);
+        },
+        onPanResponderRelease: endDrag,
+        onPanResponderTerminate: endDrag,
+      }),
+    [beginDrag, endDrag, updateDrag],
+  );
+
+  const panResponders = useMemo(
+    () => ({
+      bl: createPanResponder("bl"),
+      bottom: createPanResponder("bottom"),
+      br: createPanResponder("br"),
+      left: createPanResponder("left"),
+      right: createPanResponder("right"),
+      tl: createPanResponder("tl"),
+      top: createPanResponder("top"),
+      tr: createPanResponder("tr"),
+    }),
+    [createPanResponder],
+  );
 
   if (!image) {
     return null;
@@ -245,6 +336,7 @@ export function PerspectiveCropEditorModal({
       rotation,
       preset: "free",
     });
+    cornersRef.current = cropData.corners;
     setPreset("free");
     setCorners(cropData.corners);
   };
@@ -257,6 +349,7 @@ export function PerspectiveCropEditorModal({
       rotation: nextRotation,
       preset,
     });
+    cornersRef.current = cropData.corners;
     setRotation(nextRotation);
     setCorners(cropData.corners);
   };
@@ -268,6 +361,7 @@ export function PerspectiveCropEditorModal({
       rotation,
       preset: nextPreset,
     });
+    cornersRef.current = cropData.corners;
     setPreset(nextPreset);
     setCorners(cropData.corners);
   };
@@ -287,29 +381,6 @@ export function PerspectiveCropEditorModal({
       rotateDegrees: rotation,
     });
   };
-
-  const createPanResponder = (target: DragTarget) =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        dragStartCorners.current = corners;
-      },
-      onPanResponderMove: (_, gesture) => {
-        if (imageRect.width <= 0 || imageRect.height <= 0) {
-          return;
-        }
-        setPreset("free");
-        setCorners(
-          moveTarget(
-            dragStartCorners.current,
-            target,
-            gesture.dx / imageRect.width,
-            gesture.dy / imageRect.height,
-          ),
-        );
-      },
-    });
 
   return (
     <Modal
@@ -422,7 +493,7 @@ export function PerspectiveCropEditorModal({
               return (
                 <View
                   key={target}
-                  {...createPanResponder(target as DragTarget).panHandlers}
+                  {...panResponders[target as DragTarget].panHandlers}
                   style={[
                     styles.dragHandle,
                     target.length > 2 && styles.sideHandle,
@@ -565,8 +636,10 @@ const styles = StyleSheet.create({
   },
   editorFrame: {
     flex: 1,
+    marginHorizontal: 20,
     marginTop: 8,
     minHeight: 0,
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#020817",
   },
