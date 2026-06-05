@@ -144,6 +144,7 @@ function AnimatedReelItem({
         card={card}
         focused={focused}
         height={cardHeight}
+        previewMode
         width={cardWidth}
         onDoublePress={onDoublePress}
         onLongPress={onLongPress}
@@ -175,10 +176,10 @@ export function BadgeReel({
   const dimensions = useMemo(() => {
     const stageWidth = Math.min(width, 430);
     const maxCardWidth = Math.min(stageWidth - 54, 350);
-    const maxCardHeight = Math.min(maxCardWidth * 1.45, height * 0.54);
+    const maxCardHeight = Math.min(maxCardWidth * 1.56, height * 0.6);
     const stageHeight = Math.min(
-      Math.max(maxCardHeight + 150, 430),
-      height * 0.66,
+      Math.max(maxCardHeight + 138, 430),
+      height * 0.7,
     );
     return {
       maxCardWidth,
@@ -362,6 +363,7 @@ function ReducedMotionCard({
       card={card}
       focused
       height={cardSize.height}
+      previewMode
       width={cardSize.width}
       onDoublePress={onDoublePress}
       onLongPress={onLongPress}

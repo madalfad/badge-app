@@ -22,6 +22,7 @@ type AssetReplacementPanelProps = {
   onCamera: () => void;
   onLibrary: () => void;
   onRotate: () => void;
+  onEditCrop: () => void;
   onDiscardPending: () => void;
   onSaveReplacement: () => void;
   onRemove?: () => void;
@@ -35,6 +36,7 @@ export function AssetReplacementPanel({
   onCamera,
   onLibrary,
   onRotate,
+  onEditCrop,
   onDiscardPending,
   onSaveReplacement,
   onRemove,
@@ -61,6 +63,7 @@ export function AssetReplacementPanel({
         onDiscardPending={onDiscardPending}
         onLibrary={onLibrary}
         onRemove={onRemove}
+        onEditCrop={onEditCrop}
         onRotate={onRotate}
         onSaveReplacement={onSaveReplacement}
       />
@@ -187,6 +190,7 @@ function AssetActions({
   onCamera,
   onLibrary,
   onRotate,
+  onEditCrop,
   onDiscardPending,
   onSaveReplacement,
   onRemove,
@@ -199,6 +203,11 @@ function AssetActions({
         label="Rotate"
         onPress={onRotate}
         disabled={!pendingImage || isSaving}
+      />
+      <PanelButton
+        label="Edit crop"
+        onPress={onEditCrop}
+        disabled={(!pendingImage && !asset) || isSaving}
       />
       {pendingImage ? (
         <PendingImageActions

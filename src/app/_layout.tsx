@@ -22,6 +22,10 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen name="index" />
+              <Stack.Screen name="search" />
+              <Stack.Screen name="reels/index" />
+              <Stack.Screen name="reels/new" />
+              <Stack.Screen name="reels/[id]/edit" />
               <Stack.Screen
                 name="add/index"
                 options={{ presentation: "modal" }}

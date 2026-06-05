@@ -29,7 +29,7 @@ import {
   type SourceCardImage,
 } from "@/storage/imagePipeline";
 import { createId } from "@/utils/ids";
-import type { BadgeCardSection } from "./types";
+import type { BadgeCardSection, CategoryRecord } from "./types";
 
 type CreateCardFromImagesInput = {
   title: string;
@@ -131,6 +131,47 @@ function createTextCardNotes(input: UpdateCardTextContentInput) {
   });
 }
 
+async function resolveCategoryForCard(
+  db: AppDatabase,
+  categoryName: string | null | undefined,
+  primaryColor: string | null | undefined,
+) {
+  const normalizedCategoryName = categoryName?.trim() ?? "";
+  return normalizedCategoryName
+    ? upsertCategory(db, {
+        name: normalizedCategoryName,
+        color: primaryColor ?? DEFAULT_ACCENT,
+      })
+    : null;
+}
+
+async function createBaseCardRecord(
+  db: AppDatabase,
+  cardId: string,
+  input: {
+    title: string;
+    subtitle?: string | null;
+    primaryColor?: string | null;
+    isFavorite?: boolean;
+  },
+  category: CategoryRecord | null,
+  sourceType: string,
+  notes: string | null,
+) {
+  const sortOrder = await getNextSortOrder(db);
+  await createCard(db, {
+    id: cardId,
+    title: input.title.trim(),
+    subtitle: input.subtitle?.trim() || null,
+    categoryId: category?.id ?? null,
+    primaryColor: input.primaryColor ?? category?.color ?? DEFAULT_ACCENT,
+    sortOrder,
+    isFavorite: input.isFavorite ?? false,
+    sourceType,
+    notes,
+  });
+}
+
 export async function createCardFromImages(
   db: AppDatabase,
   input: CreateCardFromImagesInput,
@@ -147,25 +188,19 @@ export async function createCardFromImages(
     ]);
 
     await withWriteTransaction(db, async (txn) => {
-      const category = input.categoryName?.trim()
-        ? await upsertCategory(txn, {
-            name: input.categoryName.trim(),
-            color: input.primaryColor ?? DEFAULT_ACCENT,
-          })
-        : null;
-      const sortOrder = await getNextSortOrder(txn);
-
-      await createCard(txn, {
-        id: cardId,
-        title: input.title.trim(),
-        subtitle: input.subtitle?.trim() || null,
-        categoryId: category?.id ?? null,
-        primaryColor: input.primaryColor ?? category?.color ?? DEFAULT_ACCENT,
-        sortOrder,
-        isFavorite: input.isFavorite ?? false,
-        sourceType: "user_image",
-        notes: null,
-      });
+      const category = await resolveCategoryForCard(
+        txn,
+        input.categoryName,
+        input.primaryColor,
+      );
+      await createBaseCardRecord(
+        txn,
+        cardId,
+        input,
+        category,
+        "user_image",
+        null,
+      );
 
       await upsertAsset(txn, toAssetUpsertInput(cardId, frontAsset));
 
@@ -199,26 +234,19 @@ export async function createCardFromText(
   const cardId = createId("card");
 
   await withWriteTransaction(db, async (txn) => {
-    const categoryName = input.categoryName?.trim() ?? "";
-    const category = categoryName
-      ? await upsertCategory(txn, {
-          name: categoryName,
-          color: input.primaryColor ?? DEFAULT_ACCENT,
-        })
-      : null;
-    const sortOrder = await getNextSortOrder(txn);
-
-    await createCard(txn, {
-      id: cardId,
-      title,
-      subtitle: input.subtitle?.trim() || null,
-      categoryId: category?.id ?? null,
-      primaryColor: input.primaryColor ?? category?.color ?? DEFAULT_ACCENT,
-      sortOrder,
-      isFavorite: input.isFavorite ?? false,
-      sourceType: "user_text",
-      notes: createTextCardNotes(input),
-    });
+    const category = await resolveCategoryForCard(
+      txn,
+      input.categoryName,
+      input.primaryColor,
+    );
+    await createBaseCardRecord(
+      txn,
+      cardId,
+      { ...input, title },
+      category,
+      "user_text",
+      createTextCardNotes(input),
+    );
 
     if (input.tags) {
       await setTagsForCard(txn, cardId, input.tags);
@@ -252,13 +280,11 @@ export async function updateCardMetadata(
   }
 
   await withWriteTransaction(db, async (txn) => {
-    const categoryName = input.categoryName?.trim() ?? "";
-    const category = categoryName
-      ? await upsertCategory(txn, {
-          name: categoryName,
-          color: input.primaryColor ?? DEFAULT_ACCENT,
-        })
-      : null;
+    const category = await resolveCategoryForCard(
+      txn,
+      input.categoryName,
+      input.primaryColor,
+    );
 
     await updateCard(txn, cardId, {
       title,

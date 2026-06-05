@@ -75,6 +75,7 @@ type ZoomableImageProps = {
   uri: string;
   placeholderUri?: string | null;
   onSingleTap: () => void;
+  onHorizontalSwipe?: (direction: "left" | "right") => void;
   highContrast: boolean;
   imageWidth?: number | null;
   imageHeight?: number | null;
@@ -84,6 +85,7 @@ export function ZoomableImage({
   uri,
   placeholderUri,
   onSingleTap,
+  onHorizontalSwipe,
   highContrast,
   imageWidth,
   imageHeight,
@@ -215,8 +217,17 @@ export function ZoomableImage({
         bounds.y,
       );
     })
-    .onEnd(() => {
+    .onEnd((event) => {
       if (scale.value <= 1.03) {
+        const absX = Math.abs(event.translationX);
+        const absY = Math.abs(event.translationY);
+        const threshold = Math.min(
+          Math.max(containerWidth.value * 0.18, 58),
+          96,
+        );
+        if (onHorizontalSwipe && absX > threshold && absX > absY * 1.25) {
+          runOnJS(onHorizontalSwipe)(event.translationX < 0 ? "left" : "right");
+        }
         resetTranslation();
         return;
       }
@@ -241,7 +252,9 @@ export function ZoomableImage({
     .numberOfTaps(1)
     .maxDuration(250)
     .onEnd(() => {
-      runOnJS(onSingleTap)();
+      if (scale.value <= 1.05) {
+        runOnJS(onSingleTap)();
+      }
     });
 
   const gesture = Gesture.Simultaneous(

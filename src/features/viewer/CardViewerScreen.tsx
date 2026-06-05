@@ -65,6 +65,30 @@ export function CardViewerScreen() {
         }),
     [assets],
   );
+  const flipSide = useCallback(
+    (direction: "left" | "right" = "left") => {
+      if (availableSides.length <= 1) {
+        return false;
+      }
+
+      const currentIndex = Math.max(
+        availableSides.findIndex((asset) => asset.side === activeAsset?.side),
+        0,
+      );
+      const delta = direction === "left" ? 1 : -1;
+      const nextIndex =
+        (currentIndex + delta + availableSides.length) % availableSides.length;
+      setActiveSide(availableSides[nextIndex].side);
+      return true;
+    },
+    [activeAsset?.side, availableSides],
+  );
+  const handleStageTap = useCallback(() => {
+    if (flipSide()) {
+      return;
+    }
+    setControlsVisible((visible) => !visible);
+  }, [flipSide]);
 
   useFocusEffect(
     useCallback(() => {
@@ -162,7 +186,8 @@ export function CardViewerScreen() {
         card={card}
         highContrast={highContrast}
         placeholderUri={placeholderUri}
-        onToggleControls={() => setControlsVisible((visible) => !visible)}
+        onFlipSide={flipSide}
+        onStageTap={handleStageTap}
         onToggleFavorite={toggleFavorite}
       />
 
@@ -194,7 +219,8 @@ type CardViewerStageProps = {
   card: BadgeCard;
   highContrast: boolean;
   placeholderUri: string | null;
-  onToggleControls: () => void;
+  onFlipSide: (direction?: "left" | "right") => boolean;
+  onStageTap: () => void;
   onToggleFavorite: () => void;
 };
 
@@ -204,7 +230,8 @@ function CardViewerStage({
   card,
   highContrast,
   placeholderUri,
-  onToggleControls,
+  onFlipSide,
+  onStageTap,
   onToggleFavorite,
 }: CardViewerStageProps) {
   const layout = useBadgeLayout();
@@ -227,19 +254,22 @@ function CardViewerStage({
         highContrast={highContrast}
         imageWidth={activeAsset?.width}
         imageHeight={activeAsset?.height}
-        onSingleTap={onToggleControls}
+        onHorizontalSwipe={(direction) => {
+          onFlipSide(direction);
+        }}
+        onSingleTap={onStageTap}
       />
     );
   }
 
   return (
-    <Pressable style={styles.demoCardViewer} onPress={onToggleControls}>
+    <Pressable style={styles.demoCardViewer} onPress={onStageTap}>
       <BadgeReelCard
         card={card}
         focused
         width={fallbackSize.width}
         height={fallbackSize.height}
-        onPress={onToggleControls}
+        onPress={onStageTap}
         onDoublePress={onToggleFavorite}
         onLongPress={onToggleFavorite}
       />

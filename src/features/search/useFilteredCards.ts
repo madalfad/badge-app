@@ -89,18 +89,20 @@ function sortFilteredCards(cards: BadgeCard[], filter: CardFilter) {
   });
 }
 
+export function getCardArchiveBuckets(cards: BadgeCard[]) {
+  return {
+    activeCards: cards.filter((card) => !card.isArchived),
+    archivedCards: cards.filter((card) => card.isArchived),
+  };
+}
+
 export function useFilteredCards({
   cards,
   query,
   filter,
 }: UseFilteredCardsInput) {
-  const activeCards = useMemo(
-    () => cards.filter((card) => !card.isArchived),
-    [cards],
-  );
-
-  const archivedCards = useMemo(
-    () => cards.filter((card) => card.isArchived),
+  const { activeCards, archivedCards } = useMemo(
+    () => getCardArchiveBuckets(cards),
     [cards],
   );
 

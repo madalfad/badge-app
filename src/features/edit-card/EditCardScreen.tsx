@@ -21,6 +21,10 @@ import {
 } from "@/features/cards/CardRouteStates";
 import { NativeStorageWarning } from "@/features/cards/NativeStorageWarning";
 import {
+  PerspectiveCropEditorModal,
+  type EditableCropImage,
+} from "@/features/crop/PerspectiveCropEditorModal";
+import {
   deleteCardRecordAndFiles,
   removeCardAssetSide,
   replaceCardAssetImage,
@@ -31,14 +35,13 @@ import {
   CARD_ACCENT_PRESETS,
   parseCardTags,
 } from "@/features/cards/cardMetadata";
+import { useCardMetadataDraft } from "@/features/cards/useCardMetadataDraft";
 import {
   createDraftTextSection,
   createDraftTextSectionsFromSections,
-  normalizeTextSections,
   TextCardContentEditor,
-  type DraftTextSection,
-  type TextSectionPatch,
 } from "@/features/cards/TextCardContentEditor";
+import { useDraftTextSections } from "@/features/cards/useDraftTextSections";
 import { useCard } from "@/features/cards/useCard";
 import {
   launchCardImagePicker,
@@ -47,7 +50,12 @@ import {
 import { DEFAULT_REEL_ID } from "@/features/reels/constants";
 import { ReelMembershipField } from "@/features/reels/ReelMembershipField";
 import { useReels } from "@/features/reels/useReels";
+import type { CardAssetRecord } from "@/features/cards/types";
 import type { CardImageSide } from "@/storage/imagePipeline";
+import {
+  parseLegacyCropData,
+  parsePerspectiveCropData,
+} from "@/storage/cropGeometry";
 
 import {
   AssetReplacementPanel,
@@ -68,10 +76,27 @@ function toPendingImage(asset: ImagePicker.ImagePickerAsset): PendingCardImage {
     fileName: asset.fileName,
     mimeType: asset.mimeType,
     rotateDegrees: 0,
-    cropPreset: "auto",
+    cropPreset: "free",
   };
 }
 
+function toEditableImageFromAsset(asset: CardAssetRecord): EditableCropImage {
+  const perspectiveCrop = parsePerspectiveCropData(asset.cropDataJson);
+  const legacyCrop = parseLegacyCropData(asset.cropDataJson);
+  return {
+    uri: asset.fileUri,
+    previewUri: asset.fileUri,
+    width: perspectiveCrop?.sourceWidth ?? asset.width,
+    height: perspectiveCrop?.sourceHeight ?? asset.height,
+    mimeType: asset.mimeType,
+    rotateDegrees: perspectiveCrop?.rotation ?? legacyCrop?.rotation ?? 0,
+    cropPreset: perspectiveCrop?.preset ?? legacyCrop?.preset ?? "free",
+    cropData: perspectiveCrop ?? undefined,
+    cropDataJson: asset.cropDataJson,
+  };
+}
+
+// fallow-ignore-next-line complexity
 export function EditCardScreen() {
   const router = useRouter();
   const layout = useBadgeLayout();
@@ -85,14 +110,26 @@ export function EditCardScreen() {
   const [initializedCardId, setInitializedCardId] = useState<string | null>(
     null,
   );
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [category, setCategory] = useState("");
-  const [tagsText, setTagsText] = useState("");
-  const [code, setCode] = useState("");
-  const [textSections, setTextSections] = useState<DraftTextSection[]>(() => [
-    createDraftTextSection(),
-  ]);
+  const {
+    category,
+    code,
+    setCategory,
+    setCode,
+    setSubtitle,
+    setTagsText,
+    setTitle,
+    subtitle,
+    tagsText,
+    title,
+  } = useCardMetadataDraft();
+  const {
+    addSection: addTextSection,
+    normalizedSections: typedSections,
+    removeSection: removeTextSection,
+    sections: textSections,
+    setSections: setTextSections,
+    updateSection: updateTextSection,
+  } = useDraftTextSections(() => [createDraftTextSection()]);
   const [footer, setFooter] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
   const [accentColor, setAccentColor] = useState(CARD_ACCENT_PRESETS[0]);
@@ -104,6 +141,10 @@ export function EditCardScreen() {
     useState<PendingCardImage | null>(null);
   const [pendingBackImage, setPendingBackImage] =
     useState<PendingCardImage | null>(null);
+  const [cropTarget, setCropTarget] = useState<{
+    side: CardImageSide;
+    image: EditableCropImage;
+  } | null>(null);
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const [savingSide, setSavingSide] = useState<CardImageSide | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -115,10 +156,6 @@ export function EditCardScreen() {
   const backAsset = useMemo(
     () => assets.find((asset) => asset.side === "back") ?? null,
     [assets],
-  );
-  const typedSections = useMemo(
-    () => normalizeTextSections(textSections),
-    [textSections],
   );
   const canEditTextContent = Boolean(
     card &&
@@ -211,30 +248,16 @@ export function EditCardScreen() {
     setPendingBackImage(update);
   };
 
-  const updateTextSection = (
-    sectionId: string,
-    patch: TextSectionPatch,
-  ) => {
-    setTextSections((currentSections) =>
-      currentSections.map((section) =>
-        section.id === sectionId ? { ...section, ...patch } : section,
-      ),
-    );
-  };
+  const openCropEditor = (side: CardImageSide) => {
+    const pendingImage =
+      side === "front" ? pendingFrontImage : pendingBackImage;
+    const asset = side === "front" ? frontAsset : backAsset;
+    const image = pendingImage ?? (asset ? toEditableImageFromAsset(asset) : null);
+    if (!image) {
+      return;
+    }
 
-  const addTextSection = () => {
-    setTextSections((currentSections) => [
-      ...currentSections,
-      createDraftTextSection(),
-    ]);
-  };
-
-  const removeTextSection = (sectionId: string) => {
-    setTextSections((currentSections) =>
-      currentSections.length <= 1
-        ? currentSections
-        : currentSections.filter((section) => section.id !== sectionId),
-    );
+    setCropTarget({ side, image });
   };
 
   const saveMetadata = async () => {
@@ -499,6 +522,7 @@ export function EditCardScreen() {
                 onCamera={() => launchPicker("front", "camera")}
                 onLibrary={() => launchPicker("front", "library")}
                 onRotate={() => rotatePendingImage("front")}
+                onEditCrop={() => openCropEditor("front")}
                 onDiscardPending={() => setPendingFrontImage(null)}
                 onSaveReplacement={() => savePendingImage("front")}
               />
@@ -510,6 +534,7 @@ export function EditCardScreen() {
                 onCamera={() => launchPicker("back", "camera")}
                 onLibrary={() => launchPicker("back", "library")}
                 onRotate={() => rotatePendingImage("back")}
+                onEditCrop={() => openCropEditor("back")}
                 onDiscardPending={() => setPendingBackImage(null)}
                 onSaveReplacement={() => savePendingImage("back")}
                 onRemove={removeBackImage}
@@ -538,6 +563,20 @@ export function EditCardScreen() {
             </Pressable>
           </View>
         </ScrollView>
+        <PerspectiveCropEditorModal
+          image={cropTarget?.image ?? null}
+          sideLabel={cropTarget?.side === "back" ? "Back side" : "Front side"}
+          visible={Boolean(cropTarget)}
+          onCancel={() => setCropTarget(null)}
+          onApply={(nextImage: EditableCropImage) => {
+            if (cropTarget?.side === "front") {
+              setPendingFrontImage(nextImage);
+            } else if (cropTarget?.side === "back") {
+              setPendingBackImage(nextImage);
+            }
+            setCropTarget(null);
+          }}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

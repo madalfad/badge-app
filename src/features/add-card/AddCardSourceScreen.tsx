@@ -19,6 +19,10 @@ import { useDatabaseContext } from "@/db/DatabaseProvider";
 import { CardEditorHeader } from "@/features/cards/CardEditorHeader";
 import { CardFormField } from "@/features/cards/CardFormField";
 import { NativeStorageWarning } from "@/features/cards/NativeStorageWarning";
+import {
+  PerspectiveCropEditorModal,
+  type EditableCropImage,
+} from "@/features/crop/PerspectiveCropEditorModal";
 import { DEFAULT_REEL_ID } from "@/features/reels/constants";
 import { ReelMembershipField } from "@/features/reels/ReelMembershipField";
 import { useReels } from "@/features/reels/useReels";
@@ -26,22 +30,21 @@ import {
   createCardFromImages,
   createCardFromText,
 } from "@/features/cards/cardService";
+import { useCardMetadataDraft } from "@/features/cards/useCardMetadataDraft";
 import {
   CARD_ACCENT_PRESETS,
   parseCardTags,
 } from "@/features/cards/cardMetadata";
 import {
   createDraftTextSection,
-  normalizeTextSections,
   TextCardContentEditor,
-  type DraftTextSection,
-  type TextSectionPatch,
 } from "@/features/cards/TextCardContentEditor";
+import { useDraftTextSections } from "@/features/cards/useDraftTextSections";
 import {
   launchCardImagePicker,
   type CardImagePickerSource,
 } from "@/features/cards/cardImagePicker";
-import type { CropPreset, SourceCardImage } from "@/storage/imagePipeline";
+import type { SourceCardImage } from "@/storage/imagePipeline";
 
 type CardSide = "front" | "back";
 type CardSourceMode = "photo" | "text";
@@ -58,7 +61,7 @@ function toPickedImage(asset: ImagePicker.ImagePickerAsset): PickedCardImage {
     fileName: asset.fileName,
     mimeType: asset.mimeType,
     rotateDegrees: 0,
-    cropPreset: "auto",
+    cropPreset: "free",
   };
 }
 
@@ -70,12 +73,25 @@ export function AddCardSourceScreen() {
   const [sourceMode, setSourceMode] = useState<CardSourceMode>("photo");
   const [frontImage, setFrontImage] = useState<PickedCardImage | null>(null);
   const [backImage, setBackImage] = useState<PickedCardImage | null>(null);
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [category, setCategory] = useState("");
-  const [tagsText, setTagsText] = useState("");
-  const [code, setCode] = useState("");
-  const [textSections, setTextSections] = useState<DraftTextSection[]>(() => [
+  const {
+    category,
+    code,
+    setCategory,
+    setCode,
+    setSubtitle,
+    setTagsText,
+    setTitle,
+    subtitle,
+    tagsText,
+    title,
+  } = useCardMetadataDraft();
+  const {
+    addSection: addTextSection,
+    normalizedSections: typedSections,
+    removeSection: removeTextSection,
+    sections: textSections,
+    updateSection: updateTextSection,
+  } = useDraftTextSections(() => [
     createDraftTextSection(),
     createDraftTextSection(),
     createDraftTextSection(),
@@ -84,17 +100,13 @@ export function AddCardSourceScreen() {
   const [footer, setFooter] = useState(
     "Reference only • verify local protocol",
   );
-  const [cropPreset, setCropPreset] = useState<CropPreset>("auto");
   const [accentColor, setAccentColor] = useState(CARD_ACCENT_PRESETS[0]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedReelIds, setSelectedReelIds] = useState<string[]>([]);
   const [hasInitializedReels, setHasInitializedReels] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [cropTarget, setCropTarget] = useState<CardSide | null>(null);
 
-  const typedSections = useMemo(
-    () => normalizeTextSections(textSections),
-    [textSections],
-  );
   const canSave = Boolean(
     db &&
       title.trim().length > 0 &&
@@ -189,32 +201,7 @@ export function AddCardSourceScreen() {
     setBackImage(update);
   };
 
-  const updateTextSection = (
-    sectionId: string,
-    patch: TextSectionPatch,
-  ) => {
-    setTextSections((currentSections) =>
-      currentSections.map((section) =>
-        section.id === sectionId ? { ...section, ...patch } : section,
-      ),
-    );
-  };
-
-  const addTextSection = () => {
-    setTextSections((currentSections) => [
-      ...currentSections,
-      createDraftTextSection(),
-    ]);
-  };
-
-  const removeTextSection = (sectionId: string) => {
-    setTextSections((currentSections) =>
-      currentSections.length <= 1
-        ? currentSections
-        : currentSections.filter((section) => section.id !== sectionId),
-    );
-  };
-
+  // fallow-ignore-next-line complexity
   const handleSave = async () => {
     if (!db) {
       Alert.alert(
@@ -258,8 +245,8 @@ export function AddCardSourceScreen() {
           tags,
           isFavorite,
           primaryColor: accentColor,
-          frontImage: { ...frontImage, cropPreset },
-          backImage: backImage ? { ...backImage, cropPreset } : null,
+          frontImage,
+          backImage,
           reelIds: selectedReelIds,
         });
       } else {
@@ -355,6 +342,7 @@ export function AddCardSourceScreen() {
                   onCamera={() => launchPicker("front", "camera")}
                   onLibrary={() => launchPicker("front", "library")}
                   onRotate={() => rotateImage("front")}
+                  onEditCrop={() => setCropTarget("front")}
                   onClear={() => setFrontImage(null)}
                 />
                 <ImagePickerPanel
@@ -363,33 +351,9 @@ export function AddCardSourceScreen() {
                   onCamera={() => launchPicker("back", "camera")}
                   onLibrary={() => launchPicker("back", "library")}
                   onRotate={() => rotateImage("back")}
+                  onEditCrop={() => setCropTarget("back")}
                   onClear={() => setBackImage(null)}
                 />
-              </View>
-
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Crop preset</Text>
-                <View style={styles.segmentRow}>
-                  <SegmentButton
-                    label="Original"
-                    selected={cropPreset === "auto"}
-                    onPress={() => setCropPreset("auto")}
-                  />
-                  <SegmentButton
-                    label="Landscape crop"
-                    selected={cropPreset === "landscape"}
-                    onPress={() => setCropPreset("landscape")}
-                  />
-                  <SegmentButton
-                    label="Portrait crop"
-                    selected={cropPreset === "portrait"}
-                    onPress={() => setCropPreset("portrait")}
-                  />
-                </View>
-                <Text style={styles.helperText}>
-                  Original preserves the imported badge size. Crop presets are
-                  only applied when you want a standard card shape.
-                </Text>
               </View>
             </>
           ) : (
@@ -469,6 +433,26 @@ export function AddCardSourceScreen() {
             </View>
           </View>
         </ScrollView>
+        <PerspectiveCropEditorModal
+          image={
+            cropTarget === "front"
+              ? frontImage
+              : cropTarget === "back"
+                ? backImage
+                : null
+          }
+          sideLabel={cropTarget === "back" ? "Back side" : "Front side"}
+          visible={Boolean(cropTarget)}
+          onCancel={() => setCropTarget(null)}
+          onApply={(nextImage: EditableCropImage) => {
+            if (cropTarget === "front") {
+              setFrontImage(nextImage);
+            } else if (cropTarget === "back") {
+              setBackImage(nextImage);
+            }
+            setCropTarget(null);
+          }}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -481,6 +465,7 @@ type ImagePickerPanelProps = {
   onCamera: () => void;
   onLibrary: () => void;
   onRotate: () => void;
+  onEditCrop: () => void;
   onClear: () => void;
 };
 
@@ -491,6 +476,7 @@ function ImagePickerPanel({
   onCamera,
   onLibrary,
   onRotate,
+  onEditCrop,
   onClear,
 }: ImagePickerPanelProps) {
   return (
@@ -531,6 +517,11 @@ function ImagePickerPanel({
         <ActionButton label="Camera" onPress={onCamera} />
         <ActionButton label="Photos" onPress={onLibrary} />
         <ActionButton label="Rotate" onPress={onRotate} disabled={!image} />
+        <ActionButton
+          label="Edit crop"
+          onPress={onEditCrop}
+          disabled={!image}
+        />
         <ActionButton
           label="Clear"
           onPress={onClear}

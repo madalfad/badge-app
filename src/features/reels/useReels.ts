@@ -39,6 +39,10 @@ type UseReelsResult = {
   moveReel: (reelId: string, direction: -1 | 1) => Promise<void>;
 };
 
+type UseReelsOptions = {
+  includeArchived?: boolean;
+};
+
 function createFallbackReel(): ReelRecord {
   const now = new Date().toISOString();
   return {
@@ -77,8 +81,9 @@ function swapReelOrder(reels: ReelRecord[], reelId: string, direction: -1 | 1) {
   return nextReels;
 }
 
-export function useReels(): UseReelsResult {
+export function useReels(options: UseReelsOptions = {}): UseReelsResult {
   const { db, error: databaseError, isReady } = useDatabaseContext();
+  const includeArchived = options.includeArchived ?? false;
   const [selectedSetting, setSelectedSetting, isSelectionLoaded] =
     useStringSetting(SELECTED_REEL_SETTING_KEY, DEFAULT_REEL_ID);
   const [reels, setReels] = useState<ReelRecord[]>([]);
@@ -107,7 +112,7 @@ export function useReels(): UseReelsResult {
       }
 
       const [nextReels, activeCards] = await Promise.all([
-        listReels(db),
+        listReels(db, { includeArchived }),
         listCards(db),
       ]);
       setReels(nextReels.length > 0 ? nextReels : [createFallbackReel()]);
@@ -124,7 +129,7 @@ export function useReels(): UseReelsResult {
     } finally {
       setIsLoading(false);
     }
-  }, [databaseError, db, isReady]);
+  }, [databaseError, db, includeArchived, isReady]);
 
   useEffect(() => {
     reload();

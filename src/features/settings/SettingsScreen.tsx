@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
+import { BadgeBottomNav } from "@/components/BadgeBottomNav";
 import {
   BadgeButton,
   BadgeTopBar,
@@ -293,6 +294,7 @@ export function SettingsScreen() {
           />
         </View>
       </ScrollView>
+      <BadgeBottomNav />
     </SafeAreaView>
   );
 }

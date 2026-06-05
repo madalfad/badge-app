@@ -1,10 +1,19 @@
 import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
+import { transformPerspectiveImageAsync } from "@/native/BadgePerspectiveImage";
+
 import { copyFileToCardDirectory, deleteCardDirectory } from "./cardFileStore";
+import {
+  dimensionsAfterRotation,
+  getBoundingCropRectFromCorners,
+  normalizeRotation,
+  type CropPreset,
+  type PerspectiveCropData,
+} from "./cropGeometry";
 
 export type CardImageSide = "front" | "back";
-export type CropPreset = "auto" | "landscape" | "portrait";
+export type { CropPreset, PerspectiveCropData } from "./cropGeometry";
 
 export type SourceCardImage = {
   uri: string;
@@ -14,6 +23,7 @@ export type SourceCardImage = {
   mimeType?: string | null;
   rotateDegrees?: number;
   cropPreset?: CropPreset;
+  cropData?: PerspectiveCropData | null;
 };
 
 export type ProcessedCardAsset = {
@@ -50,27 +60,6 @@ const DISPLAY_MAX_LONG_EDGE = 2200;
 const THUMBNAIL_MAX_LONG_EDGE = 640;
 const LANDSCAPE_CARD_ASPECT_RATIO = 1.58;
 const PORTRAIT_CARD_ASPECT_RATIO = 1 / LANDSCAPE_CARD_ASPECT_RATIO;
-
-function normalizeRotation(degrees: number | undefined) {
-  if (!degrees) {
-    return 0;
-  }
-
-  const normalized = degrees % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
-
-function dimensionsAfterRotation(
-  width: number,
-  height: number,
-  degrees: number,
-) {
-  const normalized = normalizeRotation(degrees);
-  if (normalized === 90 || normalized === 270) {
-    return { width: height, height: width };
-  }
-  return { width, height };
-}
 
 function getResizeTarget(
   width: number,
@@ -216,28 +205,73 @@ async function renderVariant(
   });
 }
 
+async function renderPerspectiveVariant(
+  source: SourceCardImage,
+  cropData: PerspectiveCropData,
+  maxLongEdge: number,
+  compress: number,
+) {
+  try {
+    return await transformPerspectiveImageAsync({
+      sourceUri: source.uri,
+      corners: cropData.corners,
+      rotation: cropData.rotation,
+      maxLongEdge,
+      compress,
+    });
+  } catch {
+    const rotatedDimensions = dimensionsAfterRotation(
+      source.width,
+      source.height,
+      cropData.rotation,
+    );
+    const cropRect = getBoundingCropRectFromCorners(
+      cropData.corners,
+      rotatedDimensions.width,
+      rotatedDimensions.height,
+    );
+
+    return renderVariant(
+      { ...source, rotateDegrees: cropData.rotation },
+      cropRect,
+      maxLongEdge,
+      compress,
+    );
+  }
+}
+
+// fallow-ignore-next-line complexity
 export async function processAndStoreCardImage(
   cardId: string,
   side: CardImageSide,
   source: SourceCardImage,
   options: ProcessAndStoreCardImageOptions = {},
 ): Promise<ProcessedCardAsset> {
-  const rotation = normalizeRotation(source.rotateDegrees);
+  const perspectiveCrop = source.cropData?.mode === "perspective"
+    ? source.cropData
+    : null;
+  const rotation = normalizeRotation(
+    perspectiveCrop?.rotation ?? source.rotateDegrees,
+  );
   const rotatedDimensions = dimensionsAfterRotation(
     source.width,
     source.height,
     rotation,
   );
-  const cropAspectRatio = getCropAspectRatio(source.cropPreset);
-  const cropRect = cropAspectRatio
-    ? getCenterCropRect(
-        rotatedDimensions.width,
-        rotatedDimensions.height,
-        cropAspectRatio,
-      )
-    : null;
-  const cropDataJson =
-    cropRect || rotation || (source.cropPreset && source.cropPreset !== "auto")
+  const cropAspectRatio = perspectiveCrop
+    ? null
+    : getCropAspectRatio(source.cropPreset);
+  const cropRect =
+    !perspectiveCrop && cropAspectRatio
+      ? getCenterCropRect(
+          rotatedDimensions.width,
+          rotatedDimensions.height,
+          cropAspectRatio,
+        )
+      : null;
+  const cropDataJson = perspectiveCrop
+    ? JSON.stringify({ ...perspectiveCrop, rotation })
+    : cropRect || rotation || (source.cropPreset && source.cropPreset !== "auto")
       ? JSON.stringify({
           rotation,
           preset: source.cropPreset ?? "auto",
@@ -253,18 +287,22 @@ export async function processAndStoreCardImage(
     `${fileNamePrefix}-original.${originalExtension}`,
   );
 
-  const display = await renderVariant(
-    source,
-    cropRect,
-    DISPLAY_MAX_LONG_EDGE,
-    0.9,
-  );
-  const thumbnail = await renderVariant(
-    source,
-    cropRect,
-    THUMBNAIL_MAX_LONG_EDGE,
-    0.78,
-  );
+  const display = perspectiveCrop
+    ? await renderPerspectiveVariant(
+        source,
+        { ...perspectiveCrop, rotation },
+        DISPLAY_MAX_LONG_EDGE,
+        0.9,
+      )
+    : await renderVariant(source, cropRect, DISPLAY_MAX_LONG_EDGE, 0.9);
+  const thumbnail = perspectiveCrop
+    ? await renderPerspectiveVariant(
+        source,
+        { ...perspectiveCrop, rotation },
+        THUMBNAIL_MAX_LONG_EDGE,
+        0.78,
+      )
+    : await renderVariant(source, cropRect, THUMBNAIL_MAX_LONG_EDGE, 0.78);
 
   const displayUri = await copyFileToCardDirectory(
     display.uri,

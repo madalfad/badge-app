@@ -9,16 +9,19 @@ type BadgeReelCardProps = {
   width: number;
   height: number;
   focused: boolean;
+  previewMode?: boolean;
   onPress: () => void;
   onDoublePress: () => void;
   onLongPress: () => void;
 };
 
+// fallow-ignore-next-line complexity
 function BadgeReelCardComponent({
   card,
   width,
   height,
   focused,
+  previewMode = false,
   onPress,
   onDoublePress,
   onLongPress,
@@ -62,6 +65,14 @@ function BadgeReelCardComponent({
   const compactText = !imageUri && (height < 430 || sectionCount > 4);
   const denseText = !imageUri && (height < 390 || sectionCount > 6);
   const sectionValueLines = denseText ? 1 : 2;
+  const maxPreviewSections = denseText ? 2 : compactText ? 3 : 4;
+  const visibleSections = previewMode
+    ? card.sections.slice(0, maxPreviewSections)
+    : card.sections;
+  const hiddenSectionCount = Math.max(
+    card.sections.length - visibleSections.length,
+    0,
+  );
 
   return (
     <Pressable
@@ -155,48 +166,66 @@ function BadgeReelCardComponent({
             <Text style={styles.codeText}>{card.code}</Text>
           </View>
 
-          <Text
-            adjustsFontSizeToFit
-            minimumFontScale={0.86}
-            numberOfLines={denseText ? 1 : 2}
-            style={[styles.title, compactText && styles.compactTitle]}
-          >
-            {card.title}
-          </Text>
-          <Text
-            numberOfLines={denseText ? 1 : 2}
-            style={[styles.subtitle, compactText && styles.compactSubtitle]}
-          >
-            {card.subtitle}
-          </Text>
+          <View style={styles.textBody}>
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.86}
+              numberOfLines={denseText ? 1 : 2}
+              style={[styles.title, compactText && styles.compactTitle]}
+            >
+              {card.title}
+            </Text>
+            <Text
+              numberOfLines={denseText ? 1 : 2}
+              style={[styles.subtitle, compactText && styles.compactSubtitle]}
+            >
+              {card.subtitle}
+            </Text>
 
-          <View style={[styles.divider, compactText && styles.compactDivider]} />
+            <View
+              style={[styles.divider, compactText && styles.compactDivider]}
+            />
 
-          <View style={[styles.sections, compactText && styles.compactSections]}>
-            {card.sections.map((section, index) => (
-              <View
-                key={`${section.label}-${index}`}
-                style={[
-                  styles.sectionRow,
-                  compactText && styles.compactSectionRow,
-                ]}
-              >
-                <Text numberOfLines={1} style={styles.sectionLabel}>
-                  {section.label}
-                </Text>
-                <Text
-                  adjustsFontSizeToFit={denseText}
-                  minimumFontScale={0.82}
-                  numberOfLines={sectionValueLines}
+            <View
+              style={[styles.sections, compactText && styles.compactSections]}
+            >
+              {visibleSections.map((section, index) => (
+                <View
+                  key={`${section.label}-${index}`}
                   style={[
-                    styles.sectionValue,
-                    compactText && styles.compactSectionValue,
+                    styles.sectionRow,
+                    compactText && styles.compactSectionRow,
                   ]}
                 >
-                  {section.value}
-                </Text>
-              </View>
-            ))}
+                  <Text numberOfLines={1} style={styles.sectionLabel}>
+                    {section.label}
+                  </Text>
+                  <Text
+                    adjustsFontSizeToFit={denseText}
+                    minimumFontScale={0.82}
+                    numberOfLines={sectionValueLines}
+                    style={[
+                      styles.sectionValue,
+                      compactText && styles.compactSectionValue,
+                    ]}
+                  >
+                    {section.value}
+                  </Text>
+                </View>
+              ))}
+              {hiddenSectionCount > 0 ? (
+                <View
+                  style={[
+                    styles.moreSectionsRow,
+                    compactText && styles.compactSectionRow,
+                  ]}
+                >
+                  <Text style={styles.moreSectionsText}>
+                    +{hiddenSectionCount} more
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </View>
 
           <View
@@ -333,6 +362,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  textBody: {
+    flex: 1,
+    minHeight: 0,
+  },
   categoryPill: {
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -381,6 +414,8 @@ const styles = StyleSheet.create({
   sections: {
     gap: 10,
     flexShrink: 1,
+    minHeight: 0,
+    overflow: "hidden",
   },
   compactSections: {
     gap: 7,
@@ -413,8 +448,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
+  moreSectionsRow: {
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  moreSectionsText: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "900",
+    textAlign: "center",
+  },
   footerRow: {
-    marginTop: "auto",
     paddingTop: 14,
     flexDirection: "row",
     alignItems: "center",

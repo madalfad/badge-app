@@ -46,7 +46,7 @@ export const badgeRadius = {
   pill: 999,
 } as const;
 
-export const badgeSpace = {
+const badgeSpace = {
   1: 4,
   2: 8,
   3: 12,
@@ -208,51 +208,6 @@ export function BadgeButton({
   );
 }
 
-type BadgeIconButtonProps = PressableProps & {
-  icon: string;
-  selected?: boolean;
-  variant?: "default" | "primary" | "danger";
-  style?: StyleProp<ViewStyle>;
-};
-
-export function BadgeIconButton({
-  disabled,
-  icon,
-  onPress,
-  selected,
-  style,
-  variant = "default",
-  ...pressableProps
-}: BadgeIconButtonProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={disabled}
-      onPress={onPress}
-      {...pressableProps}
-      style={({ pressed }) => [
-        styles.iconButton,
-        selected && styles.iconButtonSelected,
-        variant === "primary" && styles.iconButtonPrimary,
-        variant === "danger" && styles.iconButtonDanger,
-        disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
-        style,
-      ]}
-    >
-      <Text
-        style={[
-          styles.iconButtonText,
-          variant === "primary" && styles.iconButtonPrimaryText,
-          variant === "danger" && styles.dangerButtonText,
-        ]}
-      >
-        {icon}
-      </Text>
-    </Pressable>
-  );
-}
-
 type BadgePanelProps = {
   children: ReactNode;
   elevated?: boolean;
@@ -263,20 +218,6 @@ export function BadgePanel({ children, elevated, style }: BadgePanelProps) {
   return (
     <View style={[styles.panel, elevated && styles.elevatedPanel, style]}>
       {children}
-    </View>
-  );
-}
-
-type BadgeSectionTitleProps = {
-  title: string;
-  detail?: string;
-};
-
-export function BadgeSectionTitle({ detail, title }: BadgeSectionTitleProps) {
-  return (
-    <View style={styles.sectionTitleRow}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {detail ? <Text style={styles.sectionDetail}>{detail}</Text> : null}
     </View>
   );
 }
@@ -415,37 +356,6 @@ const styles = StyleSheet.create({
   dangerButtonText: {
     color: "#FCA5A5",
   },
-  iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: badgeColors.border,
-    backgroundColor: badgeColors.surfaceElevated,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconButtonSelected: {
-    borderColor: alpha(badgeColors.primary, "99"),
-    backgroundColor: alpha(badgeColors.primary, "22"),
-  },
-  iconButtonPrimary: {
-    backgroundColor: badgeColors.primary,
-    borderColor: badgeColors.primary,
-  },
-  iconButtonDanger: {
-    backgroundColor: alpha(badgeColors.danger, "1F"),
-    borderColor: alpha(badgeColors.danger, "66"),
-  },
-  iconButtonText: {
-    color: badgeColors.text,
-    fontSize: 20,
-    fontWeight: "900",
-    lineHeight: 22,
-  },
-  iconButtonPrimaryText: {
-    color: badgeColors.onPrimary,
-  },
   panel: {
     borderRadius: badgeRadius.xl,
     borderWidth: 1,
@@ -456,27 +366,6 @@ const styles = StyleSheet.create({
   },
   elevatedPanel: {
     backgroundColor: alpha(badgeColors.surface, "E6"),
-  },
-  sectionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: badgeSpace[3],
-  },
-  sectionTitle: {
-    color: badgeColors.text,
-    fontSize: 17,
-    fontWeight: "900",
-  },
-  sectionDetail: {
-    overflow: "hidden",
-    borderRadius: badgeRadius.pill,
-    backgroundColor: badgeColors.surfaceElevated,
-    color: "#CBD5E1",
-    fontSize: 11,
-    fontWeight: "900",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
   textField: {
     minHeight: 48,
