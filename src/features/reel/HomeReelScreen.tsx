@@ -21,6 +21,7 @@ import { useCards } from "@/features/cards/useCards";
 import { useReels } from "@/features/reels/useReels";
 import { getCardArchiveBuckets } from "@/features/search/useFilteredCards";
 import { useBooleanSetting } from "@/features/settings/useBooleanSetting";
+import { subscribeToTabReset } from "@/navigation/tabResetEvents";
 
 import { BadgeReel } from "./BadgeReel";
 
@@ -43,6 +44,7 @@ export function HomeReelScreen() {
   const [quickActionCard, setQuickActionCard] = useState<BadgeCard | null>(
     null,
   );
+  const [reelResetSignal, setReelResetSignal] = useState(0);
   const reloadReels = reelsState.reload;
 
   useFocusEffect(
@@ -50,6 +52,16 @@ export function HomeReelScreen() {
       reload();
       reloadReels().catch(() => undefined);
     }, [reload, reloadReels]),
+  );
+
+  useFocusEffect(
+    useCallback(
+      () =>
+        subscribeToTabReset("/", () => {
+          setReelResetSignal((value) => value + 1);
+        }),
+      [],
+    ),
   );
 
   const { activeCards, archivedCards } = useMemo(
@@ -177,6 +189,7 @@ export function HomeReelScreen() {
               onCardLongPress={setQuickActionCard}
               onCardPress={handleCardPress}
               onFavoriteToggle={handleFavoriteToggle}
+              resetSignal={reelResetSignal}
               onViewArchived={() =>
                 router.push({
                   pathname: "/search",
@@ -237,6 +250,7 @@ type HomeReelContentProps = {
   onCardLongPress: (card: BadgeCard) => void;
   onCardPress: (card: BadgeCard) => void;
   onFavoriteToggle: (card: BadgeCard) => void;
+  resetSignal: number;
   onViewArchived: () => void;
 };
 
@@ -250,6 +264,7 @@ function HomeReelContent({
   onCardLongPress,
   onCardPress,
   onFavoriteToggle,
+  resetSignal,
   onViewArchived,
 }: HomeReelContentProps) {
   if (activeCards.length === 0 && isLoading) {
@@ -291,6 +306,7 @@ function HomeReelContent({
       onCardLongPress={onCardLongPress}
       onCardPress={onCardPress}
       onFavoriteToggle={onFavoriteToggle}
+      resetSignal={resetSignal}
     />
   );
 }

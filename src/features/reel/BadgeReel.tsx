@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -38,6 +38,7 @@ type BadgeReelProps = {
   onCardPress: (card: BadgeCard) => void;
   onCardLongPress: (card: BadgeCard) => void;
   onFavoriteToggle: (card: BadgeCard) => void;
+  resetSignal?: number;
 };
 
 type AnimatedReelItemProps = {
@@ -159,6 +160,7 @@ export function BadgeReel({
   initialCardId,
   reduceMotion,
   hapticsEnabled,
+  resetSignal,
   onCardPress,
   onCardLongPress,
   onFavoriteToggle,
@@ -171,6 +173,7 @@ export function BadgeReel({
   const progress = useSharedValue(initialIndex);
   const panStartProgress = useSharedValue(initialIndex);
   const activeIndexRef = useRef(initialIndex);
+  const reducedMotionScrollRef = useRef<ScrollView>(null);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
 
   const dimensions = useMemo(() => {
@@ -225,6 +228,18 @@ export function BadgeReel({
     [progress],
   );
 
+  useEffect(() => {
+    if (resetSignal === undefined) {
+      return;
+    }
+
+    activeIndexRef.current = 0;
+    setActiveIndex(0);
+    panStartProgress.value = 0;
+    progress.value = withSpring(0, springConfig);
+    reducedMotionScrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [panStartProgress, progress, resetSignal]);
+
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
@@ -273,6 +288,7 @@ export function BadgeReel({
   if (reduceMotion) {
     return (
       <ScrollView
+        ref={reducedMotionScrollRef}
         accessibilityLabel="Reduced motion badge card list"
         contentContainerStyle={styles.reducedMotionList}
         showsVerticalScrollIndicator={false}

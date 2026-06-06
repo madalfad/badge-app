@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BadgeIcon, type BadgeIconName } from "./BadgeIcon";
 import { alpha, badgeColors, badgeRadius } from "./badge-ui";
+import { emitTabReset } from "@/navigation/tabResetEvents";
 
 type BottomNavRoute = "/" | "/reels" | "/add" | "/search" | "/settings";
 
@@ -37,6 +38,15 @@ export function BadgeBottomNav() {
   const router = useRouter();
   const pathname = usePathname();
 
+  const handlePress = (item: BottomNavItem) => {
+    if (pathname === item.href) {
+      emitTabReset(item.href);
+      return;
+    }
+
+    router.push(item.href as Href);
+  };
+
   return (
     <View style={styles.wrapper}>
       {NAV_ITEMS.map((item) => {
@@ -47,7 +57,7 @@ export function BadgeBottomNav() {
             accessibilityRole="button"
             accessibilityLabel={item.label}
             accessibilityState={{ selected }}
-            onPress={() => router.push(item.href as Href)}
+            onPress={() => handlePress(item)}
             style={({ pressed }) => [
               styles.navButton,
               item.center && styles.centerButton,

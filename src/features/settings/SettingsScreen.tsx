@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import { BadgeBottomNav } from "@/components/BadgeBottomNav";
 import {
@@ -19,8 +19,14 @@ import {
   BadgeTopBar,
   useBadgeLayout,
 } from "@/components/badge-ui";
+import { useDatabaseContext } from "@/db/DatabaseProvider";
+import {
+  pickAndRestoreBadgeDeckBackup,
+  shareBadgeDeckBackup,
+} from "@/features/backup/backupService";
 import { AppLockRecoveryNotice } from "@/features/security/AppLockRecoveryNotice";
 import { useDeviceAuthAvailability } from "@/features/security/useDeviceAuthAvailability";
+import { subscribeToTabReset } from "@/navigation/tabResetEvents";
 
 import { useBooleanSetting } from "./useBooleanSetting";
 import { useStringSetting } from "./useStringSetting";
@@ -38,6 +44,8 @@ const TIMEOUT_OPTIONS = [
 export function SettingsScreen() {
   const router = useRouter();
   const layout = useBadgeLayout();
+  const { db } = useDatabaseContext();
+  const scrollRef = useRef<ScrollView>(null);
   const [privacyAccepted, setPrivacyAccepted] = useBooleanSetting(
     "privacy_notice_accepted",
     false,
@@ -62,7 +70,21 @@ export function SettingsScreen() {
   const [confirmPin, setConfirmPin] = useState("");
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [isSavingLock, setIsSavingLock] = useState(false);
+  const [backupAction, setBackupAction] = useState<"export" | "restore" | null>(
+    null,
+  );
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const deviceAuth = useDeviceAuthAvailability();
+
+  useFocusEffect(
+    useCallback(
+      () =>
+        subscribeToTabReset("/settings", () => {
+          scrollRef.current?.scrollTo({ y: 0, animated: true });
+        }),
+      [],
+    ),
+  );
 
   const enableAppLock = async () => {
     setSecurityError(null);
@@ -132,6 +154,76 @@ export function SettingsScreen() {
     );
   };
 
+  const exportBackup = async () => {
+    if (!db) {
+      setBackupStatus("Native storage is required to export a backup.");
+      return;
+    }
+
+    setBackupAction("export");
+    setBackupStatus(null);
+    try {
+      const result = await shareBadgeDeckBackup(db);
+      setBackupStatus(
+        `Exported ${result.cardCount} cards and ${result.reelCount} reels.`,
+      );
+    } catch (caughtError) {
+      setBackupStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Backup export failed.",
+      );
+    } finally {
+      setBackupAction(null);
+    }
+  };
+
+  const restoreBackup = async () => {
+    if (!db) {
+      setBackupStatus("Native storage is required to restore a backup.");
+      return;
+    }
+
+    setBackupAction("restore");
+    setBackupStatus(null);
+    try {
+      const result = await pickAndRestoreBadgeDeckBackup(db);
+      if (!result) {
+        setBackupStatus("Restore cancelled.");
+        return;
+      }
+
+      setBackupStatus(
+        `Restored ${result.cardCount} cards and ${result.reelCount} reels.`,
+      );
+    } catch (caughtError) {
+      setBackupStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Backup restore failed.",
+      );
+    } finally {
+      setBackupAction(null);
+    }
+  };
+
+  const confirmRestoreBackup = () => {
+    Alert.alert(
+      "Restore backup?",
+      "This replaces the local card library, reels, tags, and app settings with the selected .badgedeck file. App lock will be disabled because the secure PIN is device-local.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Restore",
+          style: "destructive",
+          onPress: () => {
+            restoreBackup().catch(() => undefined);
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <BadgeTopBar
@@ -157,6 +249,7 @@ export function SettingsScreen() {
       />
 
       <ScrollView
+        ref={scrollRef}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -182,6 +275,54 @@ export function SettingsScreen() {
             value={privacyAccepted}
             onValueChange={setPrivacyAccepted}
           />
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderCopy}>
+              <Text style={styles.sectionTitle}>Backup & restore</Text>
+              <Text style={styles.sectionText}>
+                Export or restore a versioned .badgedeck file with cards, reels,
+                tags, settings, and local images.
+              </Text>
+            </View>
+            {backupAction ? <ActivityIndicator color="#2DD4BF" /> : null}
+          </View>
+          <View style={styles.backupActions}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={Boolean(backupAction)}
+              onPress={exportBackup}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                styles.backupButton,
+                backupAction && styles.disabledButton,
+                pressed && !backupAction && styles.pressed,
+              ]}
+            >
+              <Text style={styles.primaryButtonText}>
+                {backupAction === "export" ? "Exporting..." : "Export backup"}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={Boolean(backupAction)}
+              onPress={confirmRestoreBackup}
+              style={({ pressed }) => [
+                styles.dangerButton,
+                styles.backupButton,
+                backupAction && styles.disabledButton,
+                pressed && !backupAction && styles.pressed,
+              ]}
+            >
+              <Text style={styles.dangerButtonText}>
+                {backupAction === "restore" ? "Restoring..." : "Restore backup"}
+              </Text>
+            </Pressable>
+          </View>
+          {backupStatus ? (
+            <Text style={styles.backupStatusText}>{backupStatus}</Text>
+          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -521,6 +662,22 @@ const styles = StyleSheet.create({
     color: "#04111F",
     fontSize: 13,
     fontWeight: "900",
+  },
+  backupActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  backupButton: {
+    alignSelf: "stretch",
+    flexBasis: 150,
+    flexGrow: 1,
+  },
+  backupStatusText: {
+    color: "#CBD5E1",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "800",
   },
   dangerButton: {
     alignSelf: "flex-start",

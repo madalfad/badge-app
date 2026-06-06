@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BadgeBottomNav } from "@/components/BadgeBottomNav";
@@ -13,6 +13,7 @@ import {
 import type { BadgeCard } from "@/features/cards/types";
 import { useCards } from "@/features/cards/useCards";
 import { useBooleanSetting } from "@/features/settings/useBooleanSetting";
+import { subscribeToTabReset } from "@/navigation/tabResetEvents";
 
 import { SearchFilterBar } from "./SearchFilterBar";
 import { SearchResultsList } from "./SearchResultsList";
@@ -31,6 +32,7 @@ export function SearchScreen() {
     useCards();
   const [hapticsEnabled] = useBooleanSetting("haptics_enabled", true);
   const [query, setQuery] = useState("");
+  const resultsScrollRef = useRef<ScrollView>(null);
   const [filter, setFilter] = useState<CardFilter>(() =>
     getInitialFilter(params.filter),
   );
@@ -39,6 +41,16 @@ export function SearchScreen() {
     useCallback(() => {
       reload();
     }, [reload]),
+  );
+
+  useFocusEffect(
+    useCallback(
+      () =>
+        subscribeToTabReset("/search", () => {
+          resultsScrollRef.current?.scrollTo({ y: 0, animated: true });
+        }),
+      [],
+    ),
   );
 
   const { categories, filteredCards, tags } = useFilteredCards({
@@ -104,6 +116,7 @@ export function SearchScreen() {
               }
               onCardPress={openCard}
               onFavoriteToggle={favoriteCard}
+              scrollRef={resultsScrollRef}
             />
           ) : (
             <View style={styles.emptyState}>

@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter, type Href } from "expo-router";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -13,6 +13,7 @@ import {
 import { DEFAULT_REEL_ID } from "@/features/reels/constants";
 import type { ReelRecord } from "@/features/reels/types";
 import { useReels } from "@/features/reels/useReels";
+import { subscribeToTabReset } from "@/navigation/tabResetEvents";
 
 import { getReelIconName } from "./reelIcons";
 
@@ -20,11 +21,22 @@ export function ReelsScreen() {
   const router = useRouter();
   const layout = useBadgeLayout();
   const reelsState = useReels({ includeArchived: true });
+  const scrollRef = useRef<ScrollView>(null);
 
   useFocusEffect(
     useCallback(() => {
       reelsState.reload();
     }, [reelsState.reload]),
+  );
+
+  useFocusEffect(
+    useCallback(
+      () =>
+        subscribeToTabReset("/reels", () => {
+          scrollRef.current?.scrollTo({ y: 0, animated: true });
+        }),
+      [],
+    ),
   );
 
   const activeReels = useMemo(
@@ -54,6 +66,7 @@ export function ReelsScreen() {
         ]}
       >
         <ScrollView
+          ref={scrollRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >

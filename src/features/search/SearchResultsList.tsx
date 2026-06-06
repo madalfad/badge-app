@@ -1,5 +1,13 @@
 import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { RefObject } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ScrollView as ScrollViewType,
+} from "react-native";
 
 import type { BadgeCard } from "@/features/cards/types";
 
@@ -8,6 +16,7 @@ type SearchResultsListProps = {
   onCardPress: (card: BadgeCard) => void;
   onCardLongPress: (card: BadgeCard) => void;
   onFavoriteToggle: (card: BadgeCard) => void;
+  scrollRef?: RefObject<ScrollViewType | null>;
 };
 
 export function SearchResultsList({
@@ -15,9 +24,11 @@ export function SearchResultsList({
   onCardPress,
   onCardLongPress,
   onFavoriteToggle,
+  scrollRef,
 }: SearchResultsListProps) {
   return (
     <ScrollView
+      ref={scrollRef}
       accessibilityLabel="Filtered badge card results"
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}

@@ -85,3 +85,22 @@ export function deleteCardDirectory(cardId: string) {
     // Directory cleanup is best effort for the same reason as individual files.
   }
 }
+
+export function deleteCardDirectoriesExcept(cardIdsToKeep: string[]) {
+  try {
+    const keep = new Set(cardIdsToKeep);
+    const directory = getCardsDirectory();
+    if (!directory.exists) {
+      return;
+    }
+
+    for (const entry of directory.list()) {
+      if (entry instanceof Directory && !keep.has(entry.name)) {
+        entry.delete();
+      }
+    }
+  } catch {
+    // Post-restore cleanup is best effort; stale files should not invalidate a
+    // successful database restore.
+  }
+}
